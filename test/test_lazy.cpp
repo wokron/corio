@@ -12,7 +12,7 @@ struct SimpleAwaiter {
 
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
-        corio::handle_resume(handle);
+        asio::post(handle.promise().strand(), [h = handle] { h.resume(); });
     }
 
     void await_resume() noexcept {}
@@ -29,7 +29,8 @@ struct GatherAwaiter {
             int r = co_await lazy;
             count--;
             if (count == 0) {
-                corio::handle_resume(handle);
+                asio::post(handle.promise().strand(),
+                           [h = handle] { h.resume(); });
             }
         };
 

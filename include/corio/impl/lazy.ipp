@@ -45,6 +45,14 @@ template <typename T> inline bool Lazy<T>::is_finished() const {
     return finished;
 }
 
+template <typename T> inline void Lazy<T>::execute() {
+    CORIO_ASSERT(handle_, "The handle is null");
+    promise_type &promise = handle_.promise();
+    CORIO_ASSERT(promise.executor(), "The executor is not set");
+    auto &strand = promise.strand();
+    asio::post(strand, [h = handle_] { h.resume(); });
+}
+
 template <typename T>
 template <typename PromiseType>
 inline std::coroutine_handle<typename Lazy<T>::promise_type>
@@ -55,14 +63,6 @@ Lazy<T>::chain_coroutine(std::coroutine_handle<PromiseType> caller_handle) {
     promise.set_strand(caller_promise.strand());
     promise.set_caller_handle(caller_handle);
     return handle_;
-}
-
-template <typename PromiseType>
-void handle_resume(std::coroutine_handle<PromiseType> handle) {
-    PromiseType &promise = handle.promise();
-    CORIO_ASSERT(promise.executor(), "The executor is not set");
-    auto &strand = promise.strand();
-    asio::post(strand, [h = handle] { h.resume(); });
 }
 
 template <typename T> class LazyAwaiter {

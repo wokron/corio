@@ -13,9 +13,6 @@ template <typename T> class LazyPromise;
 
 template <typename T> class LazyAwaiter;
 
-template <typename PromiseType>
-inline void handle_resume(std::coroutine_handle<PromiseType> handle);
-
 template <typename T> class Lazy {
 public:
     using promise_type = LazyPromise<T>;
@@ -78,10 +75,7 @@ public:
         return handle_.promise().strand();
     }
 
-    void execute() {
-        CORIO_ASSERT(handle_, "The handle is null");
-        handle_resume(handle_);
-    }
+    void execute();
 
     template <typename PromiseType>
     std::coroutine_handle<promise_type>
