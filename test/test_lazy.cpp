@@ -1,3 +1,5 @@
+#include <chrono>
+#include <corio/detail/defer.hpp>
 #include <corio/lazy.hpp>
 #include <doctest/doctest.h>
 #include <memory>
@@ -100,6 +102,28 @@ struct ChangeExecutorAwaiter {
     void await_resume() noexcept {}
 
     asio::any_io_executor executor;
+};
+
+struct CancelableSimpleAwaiter {
+    bool await_ready() noexcept { return false; }
+
+    template <typename PromiseType>
+    void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
+        PromiseType &promise = handle.promise();
+        CORIO_ASSERT(promise.executor(), "The executor is not set");
+        auto &strand = promise.strand();
+        asio::post(strand, [h = handle, c = cancelled] {
+            if (!*c) {
+                h.resume();
+            }
+        });
+    }
+
+    void await_resume() noexcept {}
+
+    ~CancelableSimpleAwaiter() { *cancelled = true; }
+
+    std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
 };
 
 } // namespace
@@ -297,5 +321,42 @@ TEST_CASE("test lazy") {
         io2.join();
 
         CHECK(called);
+    }
+
+    SUBCASE("destroy before finish") {
+        int count = 0;
+        bool called = false;
+        auto g = [&]() -> corio::Lazy<void> {
+            co_await CancelableSimpleAwaiter{};
+            count++;
+        };
+        auto f = [&]() -> corio::Lazy<int> {
+            corio::detail::DeferGuard guard([&] { called = true; });
+            while (true) {
+                co_await g();
+            }
+            co_return 42;
+        };
+
+        auto lazy = f();
+        CHECK(!lazy.is_finished());
+
+        asio::io_context io_context;
+
+        lazy.set_executor(io_context.get_executor());
+        lazy.execute();
+
+        std::thread t([&] {
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            asio::post(io_context, [&] { lazy.reset(); });
+        });
+
+        io_context.run();
+
+        t.join();
+
+        CHECK(!lazy);
+        CHECK(called);
+        CHECK(count > 0);
     }
 }

@@ -83,7 +83,7 @@ public:
 
     T await_resume() {
         update_strand_(lazy_.get_strand());
-        if (std::is_void_v<T>) {
+        if constexpr (std::is_void_v<T>) {
             lazy_.get_result().result();
         } else {
             return std::move(lazy_.get_result().result());
