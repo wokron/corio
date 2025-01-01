@@ -1,10 +1,13 @@
 #pragma once
 
 #include "corio/detail/assert.hpp"
+#include "corio/detail/concepts.hpp"
+#include "corio/detail/this_coro.hpp"
 #include "corio/result.hpp"
 #include <asio.hpp>
 #include <coroutine>
 #include <optional>
+#include <type_traits>
 
 namespace corio {
 
@@ -23,6 +26,23 @@ struct FinalAwaiter {
 };
 
 class LazyPromiseBase {
+public:
+    this_coro::detail::ExecutorAwaiter
+    await_transform(const this_coro::detail::ExecutorPlaceholder &) {
+        return {.executor = executor_};
+    }
+
+    this_coro::detail::StrandAwaiter
+    await_transform(const this_coro::detail::StrandPlaceholder &) {
+        CORIO_ASSERT(strand_.has_value(), "The strand is not set");
+        return {.strand = strand_.value()};
+    }
+
+    template <detail::awaitable Awaitable>
+    Awaitable await_transform(Awaitable &&awaitable) {
+        return std::forward<Awaitable>(awaitable);
+    }
+
 public:
     std::suspend_always initial_suspend() { return {}; }
     FinalAwaiter final_suspend() noexcept { return {destroy_when_exit_}; }
