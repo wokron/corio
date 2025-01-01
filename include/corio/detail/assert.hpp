@@ -1,5 +1,4 @@
-#ifndef CORIO_DETAIL_ASSERT_HPP
-#define CORIO_DETAIL_ASSERT_HPP
+#pragma once
 
 #include "corio/exceptions.hpp"
 #include <iostream>
@@ -48,5 +47,3 @@ inline void handle_warning(const std::string &expr, std::source_location loc,
     } while (false)
 
 } // namespace corio::detail
-
-#endif // CORIO_DETAIL_ASSERT_HPP

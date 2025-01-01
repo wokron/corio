@@ -1,5 +1,4 @@
-#ifndef CORIO_EXCEPTIONS_HPP
-#define CORIO_EXCEPTIONS_HPP
+#pragma once
 
 #include <stdexcept>
 
@@ -14,5 +13,3 @@ namespace corio {
 CORIO_DEFINE_EXCEPTION(AssertionError);
 
 } // namespace corio
-
-#endif // CORIO_EXCEPTIONS_HPP

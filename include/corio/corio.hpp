@@ -1,4 +1,0 @@
-#ifndef CORIO_CORIO_HPP
-#define CORIO_CORIO_HPP
-
-#endif // CORIO_CORIO_HPP
