@@ -83,10 +83,12 @@ public:
 
     T await_resume() {
         update_strand_(lazy_.get_strand());
+        Result<T> result = std::move(lazy_.get_result());
+        lazy_.reset(); // Destroy the handle
         if constexpr (std::is_void_v<T>) {
-            lazy_.get_result().result();
+            result.result();
         } else {
-            return std::move(lazy_.get_result().result());
+            return std::move(result.result());
         }
     }
 

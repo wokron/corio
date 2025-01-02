@@ -4,6 +4,7 @@
 #include <doctest/doctest.h>
 #include <memory>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -23,10 +24,11 @@ struct GatherAwaiter {
 
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
-        auto callback =
-            [](corio::Lazy<int> &lazy, int &count,
-               std::coroutine_handle<PromiseType> handle) -> corio::Lazy<void> {
+        auto callback = [](int no, corio::Lazy<int> &lazy, int &count,
+                           std::coroutine_handle<PromiseType> handle,
+                           std::vector<int> &results) -> corio::Lazy<void> {
             int r = co_await lazy;
+            results[no] = r;
             count--;
             if (count == 0) {
                 asio::post(handle.promise().strand(),
@@ -35,25 +37,22 @@ struct GatherAwaiter {
         };
 
         count = lazys.size();
+        results.resize(count);
+        int no = 0;
         for (auto &lazy : lazys) {
-            auto entry = callback(lazy, count, handle);
+            auto entry = callback(no, lazy, count, handle, results);
             entry.set_strand(handle.promise().strand());
             entry.execute();
             auto h = entry.release();
             h.promise().set_destroy_when_exit(true);
+            no++;
         }
     }
 
-    std::vector<int> await_resume() noexcept {
-        std::vector<int> results;
-        for (auto &lazy : lazys) {
-            CHECK(lazy.is_finished());
-            results.push_back(lazy.get_result().result());
-        }
-        return results;
-    }
+    std::vector<int> await_resume() noexcept { return results; }
 
     std::vector<corio::Lazy<int>> lazys;
+    std::vector<int> results;
     int count;
 };
 
