@@ -1,7 +1,6 @@
 #pragma once
 
 #include <coroutine>
-#include <unistd.h>
 
 namespace corio::detail {
 
