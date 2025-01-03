@@ -174,6 +174,8 @@ TEST_CASE("test task") {
             CHECK(!ok);
 
             CHECK_THROWS_AS(co_await task, corio::CancellationError);
+            CHECK(task.is_finished());
+            CHECK(task.is_cancelled());
         };
 
         corio::spawn(pool.get_executor(), g());
@@ -203,6 +205,9 @@ TEST_CASE("test task") {
             // AbortHandle is copiable
             auto task_cancel = co_await corio::spawn(h(abort_handle));
             CHECK_THROWS_AS(co_await task, corio::CancellationError);
+            CHECK(task.is_finished());
+            CHECK(task.is_cancelled());
+
             co_await task_cancel;
             called = true;
             auto ok = abort_handle.abort();
