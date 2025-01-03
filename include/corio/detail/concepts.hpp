@@ -16,7 +16,7 @@ concept awaiter =
 template <typename Awaitable, typename Promise = void>
 concept awaitable =
     awaiter<Awaitable, Promise> || requires(Awaitable awaiter) {
-                                     { awaiter.operator co_await() };
-                                 };
+                                       { awaiter.operator co_await() };
+                                   };
 
 } // namespace corio::detail

@@ -1,7 +1,7 @@
 #pragma once
 
+#include "corio/detail/lazy_promise.hpp"
 #include "corio/lazy.hpp"
-#include "corio/lazy_promise.hpp"
 
 namespace corio {
 

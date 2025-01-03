@@ -9,13 +9,15 @@
 
 namespace corio {
 
+namespace detail {
 template <typename T> class LazyPromise;
+}
 
 template <typename T> class LazyAwaiter;
 
 template <typename T> class Lazy {
 public:
-    using promise_type = LazyPromise<T>;
+    using promise_type = detail::LazyPromise<T>;
 
     explicit Lazy(std::coroutine_handle<promise_type> handle)
         : handle_(handle) {}

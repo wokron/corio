@@ -1,6 +1,8 @@
 #pragma once
 
+#include "corio/exceptions.hpp"
 #include "corio/task.hpp"
+#include "corio/this_coro.hpp"
 
 namespace corio {
 
@@ -122,7 +124,7 @@ template <typename T> struct TaskLazyAwaiter {
     bool await_ready() const noexcept { return false; }
 
     template <typename PromiseType>
-    std::coroutine_handle<typename Lazy<T>::promise_type>
+    std::coroutine_handle<typename corio::Lazy<T>::promise_type>
     await_suspend(std::coroutine_handle<PromiseType> caller_handle) {
         return lazy.chain_coroutine(caller_handle);
     }

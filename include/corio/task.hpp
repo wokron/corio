@@ -2,10 +2,8 @@
 
 #include "corio/detail/assert.hpp"
 #include "corio/detail/task_shared_state.hpp"
-#include "corio/exceptions.hpp"
 #include "corio/lazy.hpp"
 #include "corio/result.hpp"
-#include "corio/this_coro.hpp"
 #include <asio.hpp>
 #include <coroutine>
 #include <memory>

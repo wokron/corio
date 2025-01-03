@@ -10,8 +10,10 @@
 #include <type_traits>
 
 namespace corio {
-
 template <typename T> class Lazy;
+}
+
+namespace corio::detail {
 
 struct FinalAwaiter {
     bool await_ready() noexcept { return ready; }
@@ -84,60 +86,60 @@ private:
 
 template <typename T> class LazyPromise : public LazyPromiseBase {
 public:
-    Lazy<T> get_return_object();
+    corio::Lazy<T> get_return_object();
 
     void return_value(T &&value) {
-        result_ = Result<T>::from_result(std::forward<T>(value));
+        result_ = corio::Result<T>::from_result(std::forward<T>(value));
     }
 
     void unhandled_exception() {
-        result_ = Result<T>::from_exception(std::current_exception());
+        result_ = corio::Result<T>::from_exception(std::current_exception());
     }
 
 public:
     bool is_finished() const { return result_.has_value(); }
 
-    Result<T> &get_result() {
+    corio::Result<T> &get_result() {
         CORIO_ASSERT(is_finished(), "The result is not ready");
         return result_.value();
     }
 
-    const Result<T> &get_result() const {
+    const corio::Result<T> &get_result() const {
         CORIO_ASSERT(is_finished(), "The result is not ready");
         return result_.value();
     }
 
 private:
-    std::optional<Result<T>> result_;
+    std::optional<corio::Result<T>> result_;
 };
 
 template <> class LazyPromise<void> : public LazyPromiseBase {
 public:
-    Lazy<void> get_return_object();
+    corio::Lazy<void> get_return_object();
 
-    void return_void() { result_ = Result<void>::from_result(); }
+    void return_void() { result_ = corio::Result<void>::from_result(); }
 
     void unhandled_exception() {
-        result_ = Result<void>::from_exception(std::current_exception());
+        result_ = corio::Result<void>::from_exception(std::current_exception());
     }
 
 public:
     bool is_finished() const { return result_.has_value(); }
 
-    Result<void> &get_result() {
+    corio::Result<void> &get_result() {
         CORIO_ASSERT(is_finished(), "The result is not ready");
         return result_.value();
     }
 
-    const Result<void> &get_result() const {
+    const corio::Result<void> &get_result() const {
         CORIO_ASSERT(is_finished(), "The result is not ready");
         return result_.value();
     }
 
 private:
-    std::optional<Result<void>> result_;
+    std::optional<corio::Result<void>> result_;
 };
 
-} // namespace corio
+} // namespace corio::detail
 
-#include "corio/impl/lazy_promise.ipp"
+#include "corio/detail/impl/lazy_promise.ipp"
