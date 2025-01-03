@@ -41,7 +41,7 @@ public:
     }
 
     template <detail::awaitable Awaitable>
-    Awaitable await_transform(Awaitable &&awaitable) {
+    Awaitable &&await_transform(Awaitable &&awaitable) {
         return std::forward<Awaitable>(awaitable);
     }
 
