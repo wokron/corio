@@ -11,5 +11,6 @@
 namespace corio {
 
 CORIO_DEFINE_EXCEPTION(AssertionError);
+CORIO_DEFINE_EXCEPTION(CancellationError);
 
 } // namespace corio
