@@ -17,12 +17,14 @@ namespace corio {
 
 template <typename T> class Task;
 
-template <typename T> class TaskAwaiter;
-
 template <typename T> Lazy<Task<T>> spawn(Lazy<T> lazy);
 
 template <typename T>
 Task<T> spawn(asio::any_io_executor executor, Lazy<T> lazy);
+
+template <typename T> class TaskAwaiter;
+
+template <typename T> class AbortHandle;
 
 template <typename T> class Task {
 public:
@@ -54,6 +56,8 @@ public:
 
     bool abort();
 
+    AbortHandle<T> get_abort_handle();
+
     bool detach();
 
     TaskAwaiter<T> operator co_await() const;
@@ -67,6 +71,17 @@ private:
 
     std::shared_ptr<SharedState> state_ = nullptr;
     bool abort_guard_ = false;
+};
+
+template <typename T> class AbortHandle {
+public:
+    using SharedState = typename Task<T>::SharedState;
+    explicit AbortHandle(std::shared_ptr<SharedState> state) : state_(state) {}
+
+    bool abort();
+
+private:
+    std::shared_ptr<SharedState> state_;
 };
 
 } // namespace corio

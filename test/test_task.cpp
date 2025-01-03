@@ -37,7 +37,7 @@ TEST_CASE("test task") {
 
     SUBCASE("spawn tasks") {
         bool called = false;
-        asio::thread_pool pool(1);
+        asio::thread_pool pool(2);
 
         auto f1 = [&]() -> corio::Lazy<void> {
             called = true;
@@ -179,5 +179,40 @@ TEST_CASE("test task") {
         corio::spawn(pool.get_executor(), g());
 
         pool.join();
+    }
+
+    SUBCASE("abort using abort handle") {
+        bool called = false;
+        asio::thread_pool pool(2);
+
+        auto f = []() -> corio::Lazy<int> {
+            while (true) {
+                co_await CancelableSimpleAwaiter{};
+            }
+            co_return 42;
+        };
+        auto g = [&]() -> corio::Lazy<void> {
+            auto task = co_await corio::spawn(f());
+            auto abort_handle = task.get_abort_handle();
+            auto h =
+                [](corio::AbortHandle<int> abort_handle) -> corio::Lazy<void> {
+                bool ok = abort_handle.abort();
+                CHECK(ok);
+                co_return;
+            };
+            // AbortHandle is copiable
+            auto task_cancel = co_await corio::spawn(h(abort_handle));
+            CHECK_THROWS_AS(co_await task, corio::CancellationError);
+            co_await task_cancel;
+            called = true;
+            auto ok = abort_handle.abort();
+            CHECK(!ok);
+        };
+
+        corio::spawn(pool.get_executor(), g());
+
+        pool.join();
+
+        CHECK(called);
     }
 }

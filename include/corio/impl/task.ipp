@@ -51,6 +51,11 @@ template <typename T> bool Task<T>::abort() {
     return state_->request_abort();
 }
 
+template <typename T> AbortHandle<T> Task<T>::get_abort_handle() {
+    CORIO_ASSERT(state_ != nullptr, "Task is not initialized");
+    return AbortHandle<T>(state_);
+}
+
 template <typename T> bool Task<T>::detach() {
     if (state_ == nullptr) {
         return false;
@@ -160,6 +165,11 @@ template <typename T> Lazy<Task<T>> spawn(Lazy<T> lazy) {
     // use executor instead of strand here
     asio::any_io_executor executor = co_await this_coro::executor;
     co_return spawn(executor, std::move(lazy));
+}
+
+template <typename T> bool AbortHandle<T>::abort() {
+    CORIO_ASSERT(state_ != nullptr, "The task is not initialized");
+    return state_->request_abort();
 }
 
 } // namespace corio
