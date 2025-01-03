@@ -1,5 +1,6 @@
 #include <asio.hpp>
 #include <corio/lazy.hpp>
+#include <corio/runner.hpp>
 #include <corio/task.hpp>
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
@@ -177,4 +178,26 @@ TEST_CASE("test this_coro awaitable") {
         CHECK(!called);
         CHECK(duration < 100us);
     }
+}
+
+TEST_CASE("test this_coro run_on") {
+    asio::thread_pool pool1(1), pool2(1);
+    bool called = false;
+    auto f = [&]() -> corio::Lazy<void> {
+        auto id1 = std::this_thread::get_id();
+        co_await corio::this_coro::run_on(pool2.get_executor());
+        auto id2 = std::this_thread::get_id();
+        co_await corio::this_coro::run_on(pool1.get_executor());
+        auto id3 = std::this_thread::get_id();
+        co_await corio::this_coro::run_on(pool2.get_executor());
+        auto id4 = std::this_thread::get_id();
+        CHECK(id1 != id2);
+        CHECK(id1 == id3);
+        CHECK(id2 == id4);
+        called = true;
+    };
+
+    corio::block_on(pool1.get_executor(), f());
+
+    CHECK(called);
 }

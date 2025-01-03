@@ -25,6 +25,8 @@ template <typename Rep, typename Period, typename Return>
 inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
                                  Return return_value);
 
+inline corio::Lazy<void> run_on(asio::any_io_executor executor);
+
 } // namespace corio::this_coro
 
 #include "corio/impl/this_coro.ipp"
