@@ -47,6 +47,10 @@ struct StrandAwaiter {
 };
 
 struct YieldAwaiter {
+    YieldAwaiter() = default;
+    YieldAwaiter(const YieldAwaiter &) = delete;
+    YieldAwaiter &operator=(const YieldAwaiter &) = delete;
+
     bool await_ready() const noexcept { return false; }
 
     template <typename PromiseType>
@@ -72,6 +76,8 @@ struct YieldAwaiter {
 template <typename Rep, typename Period> struct SleepAwaiter {
     explicit SleepAwaiter(std::chrono::duration<Rep, Period> duration)
         : duration(duration) {}
+    SleepAwaiter(const SleepAwaiter &) = delete;
+    SleepAwaiter &operator=(const SleepAwaiter &) = delete;
 
     bool await_ready() const noexcept { return false; }
 
@@ -97,6 +103,11 @@ template <typename Rep, typename Period> struct SleepAwaiter {
 };
 
 struct SwitchExecutorAwaiter {
+    explicit SwitchExecutorAwaiter(const asio::any_io_executor &executor)
+        : executor(executor) {}
+    SwitchExecutorAwaiter(const SwitchExecutorAwaiter &) = delete;
+    SwitchExecutorAwaiter &operator=(const SwitchExecutorAwaiter &) = delete;
+
     bool await_ready() const noexcept { return false; }
 
     template <typename PromiseType>

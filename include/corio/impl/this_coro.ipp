@@ -8,11 +8,11 @@
 
 namespace corio::this_coro {
 
-inline corio::Lazy<void> yield() { co_await detail::YieldAwaiter{}; }
+inline auto yield() { return detail::YieldAwaiter{}; }
 
 template <typename Rep, typename Period>
-inline corio::Lazy<void> sleep(std::chrono::duration<Rep, Period> duration) {
-    co_await detail::SleepAwaiter<Rep, Period>(duration);
+inline auto sleep(std::chrono::duration<Rep, Period> duration) {
+    return detail::SleepAwaiter<Rep, Period>(duration);
 }
 
 template <typename Rep, typename Period, typename Return>
@@ -22,8 +22,8 @@ inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
     co_return return_value;
 }
 
-inline corio::Lazy<void> run_on(asio::any_io_executor executor) {
-    co_await detail::SwitchExecutorAwaiter{executor};
+inline auto run_on(asio::any_io_executor executor) {
+    return detail::SwitchExecutorAwaiter(executor);
 }
 
 } // namespace corio::this_coro
