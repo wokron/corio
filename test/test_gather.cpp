@@ -1,11 +1,14 @@
 #include "asio/thread_pool.hpp"
 #include "corio/runner.hpp"
+#include <corio/any_awaitable.hpp>
 #include <corio/detail/defer.hpp>
 #include <corio/gather.hpp>
 #include <corio/lazy.hpp>
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
 #include <functional>
+#include <variant>
+#include <vector>
 
 using namespace std::chrono_literals;
 
@@ -114,5 +117,112 @@ TEST_CASE("test gather") {
 
         asio::thread_pool pool(1);
         corio::block_on(pool.get_executor(), g());
+    }
+}
+
+TEST_CASE("test gather iter") {
+    SUBCASE("gather iter basic") {
+        auto f = [](int v) -> corio::Lazy<int> { co_return v; };
+
+        std::array<corio::Lazy<int>, 3> vec;
+        vec[0] = f(1);
+        vec[1] = f(2);
+        vec[2] = f(3);
+
+        auto entry = corio::gather(vec);
+
+        asio::thread_pool pool(1);
+        auto result = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(result.size() == 3);
+        CHECK(result[0] == 1);
+        CHECK(result[1] == 2);
+        CHECK(result[2] == 3);
+    }
+
+    SUBCASE("gather iter with exception") {
+        auto f = [](int v) -> corio::Lazy<int> {
+            if (v == 2) {
+                throw std::runtime_error("error");
+            }
+            co_return v;
+        };
+
+        std::vector<corio::Lazy<int>> vec;
+        vec.push_back(f(1));
+        vec.push_back(f(2));
+        vec.push_back(f(3));
+
+        auto entry = corio::gather(vec);
+
+        asio::thread_pool pool(1);
+        CHECK_THROWS_AS(corio::block_on(pool.get_executor(), std::move(entry)),
+                        std::runtime_error);
+    }
+
+    SUBCASE("gather iter with cancel") {
+        auto f = [&](bool &called) -> corio::Lazy<void> {
+            corio::detail::DeferGuard guard([&] { called = true; });
+            co_await corio::this_coro::sleep(1s);
+        };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            bool called1 = false;
+            bool called2 = false;
+            auto t1 = co_await corio::spawn(f(called1));
+            auto t2 = co_await corio::spawn(f(called2));
+            t2.set_abort_guard(true);
+            auto exception_lazy = []() -> corio::Lazy<void> {
+                throw std::runtime_error("error");
+                co_return;
+            };
+
+            std::vector<corio::Task<void>> vec;
+            vec.push_back(std::move(t1));
+            vec.push_back(std::move(t2));
+            vec.push_back(co_await corio::spawn(exception_lazy()));
+
+            CHECK_THROWS(co_await corio::gather(vec));
+            CHECK(!called1);
+            CHECK(!called2);
+
+            vec[2] = co_await corio::spawn(exception_lazy());
+
+            CHECK_THROWS(co_await corio::gather(std::move(vec)));
+            co_await corio::this_coro::yield();
+            CHECK(!called1);
+            CHECK(called2);
+        };
+
+        asio::thread_pool pool(1);
+        corio::block_on(pool.get_executor(), g());
+    }
+
+    SUBCASE("gather with any awaitable") {
+        using T = corio::AnyAwaitable<corio::Task<void>, corio::Task<int>,
+                                      corio::Task<double>>;
+        auto f = []() -> corio::Lazy<int> { co_return 42; };
+        auto g = []() -> corio::Lazy<double> { co_return 2.34; };
+        auto h = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+
+        auto main = [&]() -> corio::Lazy<void> {
+            bool called = false;
+            std::vector<T> vec;
+            vec.push_back(co_await corio::spawn(f()));
+            vec.push_back(co_await corio::spawn(g()));
+            vec.push_back(co_await corio::spawn(h(called)));
+
+            auto result = co_await corio::gather(vec);
+            CHECK(result.size() == 3);
+            CHECK(std::get<int>(result[0]) == 42);
+            CHECK(std::get<double>(result[1]) == 2.34);
+            CHECK(called);
+            CHECK(std::holds_alternative<std::monostate>(result[2]));
+        };
+
+        asio::thread_pool pool(1);
+        corio::block_on(pool.get_executor(), main());
     }
 }
