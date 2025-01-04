@@ -12,7 +12,7 @@
 
 using namespace std::chrono_literals;
 
-TEST_CASE("test gather") {
+TEST_CASE("test try gather") {
 
     SUBCASE("gather basic") {
         auto f = []() -> corio::Lazy<int> { co_return 1; };
@@ -23,7 +23,7 @@ TEST_CASE("test gather") {
         };
         bool called = false;
 
-        auto entry = corio::gather(f(), g(), h(called));
+        auto entry = corio::try_gather(f(), g(), h(called));
 
         asio::thread_pool pool(1);
         auto [a, b, c] = corio::block_on(pool.get_executor(), std::move(entry));
@@ -33,7 +33,7 @@ TEST_CASE("test gather") {
     }
 
     SUBCASE("gather time") {
-        auto entry = corio::gather(corio::this_coro::sleep(100us),
+        auto entry = corio::try_gather(corio::this_coro::sleep(100us),
                                    corio::this_coro::sleep(200us),
                                    corio::this_coro::sleep(300us));
         asio::thread_pool pool(1);
@@ -51,7 +51,7 @@ TEST_CASE("test gather") {
 
         auto sleep = corio::this_coro::sleep(300us);
 
-        auto entry = corio::gather(f(), sleep);
+        auto entry = corio::try_gather(f(), sleep);
         asio::thread_pool pool(1);
 
         auto start = std::chrono::steady_clock::now();
@@ -75,7 +75,7 @@ TEST_CASE("test gather") {
         };
         bool called = false;
 
-        auto entry = corio::gather(f(), g());
+        auto entry = corio::try_gather(f(), g());
 
         asio::thread_pool pool(1);
         auto [a, b] = corio::block_on(pool.get_executor(), std::move(entry));
@@ -99,18 +99,18 @@ TEST_CASE("test gather") {
                 throw std::runtime_error("error");
                 co_return;
             };
-            CHECK_THROWS(co_await corio::gather(t1, t2, exception_lazy()));
+            CHECK_THROWS(co_await corio::try_gather(t1, t2, exception_lazy()));
             CHECK(!called1);
             CHECK(!called2);
 
             CHECK_THROWS(
-                co_await corio::gather(t1, std::move(t2), exception_lazy()));
+                co_await corio::try_gather(t1, std::move(t2), exception_lazy()));
             co_await corio::this_coro::yield();
             CHECK(!called1);
             CHECK(called2);
 
             CHECK_THROWS(
-                co_await corio::gather(std::move(t1), exception_lazy()));
+                co_await corio::try_gather(std::move(t1), exception_lazy()));
             co_await corio::this_coro::yield();
             CHECK(!called1); // t1 is detached, but not canceled
         };
@@ -120,7 +120,7 @@ TEST_CASE("test gather") {
     }
 }
 
-TEST_CASE("test gather iter") {
+TEST_CASE("test try gather iter") {
     SUBCASE("gather iter basic") {
         auto f = [](int v) -> corio::Lazy<int> { co_return v; };
 
@@ -129,7 +129,7 @@ TEST_CASE("test gather iter") {
         vec[1] = f(2);
         vec[2] = f(3);
 
-        auto entry = corio::gather(vec);
+        auto entry = corio::try_gather(vec);
 
         asio::thread_pool pool(1);
         auto result = corio::block_on(pool.get_executor(), std::move(entry));
@@ -152,7 +152,7 @@ TEST_CASE("test gather iter") {
         vec.push_back(f(2));
         vec.push_back(f(3));
 
-        auto entry = corio::gather(vec);
+        auto entry = corio::try_gather(vec);
 
         asio::thread_pool pool(1);
         CHECK_THROWS_AS(corio::block_on(pool.get_executor(), std::move(entry)),
@@ -181,13 +181,13 @@ TEST_CASE("test gather iter") {
             vec.push_back(std::move(t2));
             vec.push_back(co_await corio::spawn(exception_lazy()));
 
-            CHECK_THROWS(co_await corio::gather(vec));
+            CHECK_THROWS(co_await corio::try_gather(vec));
             CHECK(!called1);
             CHECK(!called2);
 
             vec[2] = co_await corio::spawn(exception_lazy());
 
-            CHECK_THROWS(co_await corio::gather(std::move(vec)));
+            CHECK_THROWS(co_await corio::try_gather(std::move(vec)));
             co_await corio::this_coro::yield();
             CHECK(!called1);
             CHECK(called2);
@@ -214,7 +214,7 @@ TEST_CASE("test gather iter") {
             vec.push_back(co_await corio::spawn(g()));
             vec.push_back(co_await corio::spawn(h(called)));
 
-            auto result = co_await corio::gather(vec);
+            auto result = co_await corio::try_gather(vec);
             CHECK(result.size() == 3);
             CHECK(std::get<int>(result[0]) == 42);
             CHECK(std::get<double>(result[1]) == 2.34);

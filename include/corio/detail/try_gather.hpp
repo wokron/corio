@@ -23,11 +23,12 @@ template <typename T> auto keep_ref(T &&value) {
     }
 }
 
-template <awaitable... Awaitables> class TupleGatherAwaiter;
+template <awaitable... Awaitables> class TupleTryGatherAwaiter;
 
-template <awaitable... Awaitables> class TupleGatherSharedState {
+template <awaitable... Awaitables> class TupleTryGatherSharedState {
 public:
-    using ReturnType = typename TupleGatherAwaiter<Awaitables...>::ReturnType;
+    using ReturnType =
+        typename TupleTryGatherAwaiter<Awaitables...>::ReturnType;
 
     void init(std::size_t rest_count, std::coroutine_handle<> resume_handle,
               asio::strand<asio::any_io_executor> strand) noexcept {
@@ -80,22 +81,22 @@ private:
     std::shared_ptr<bool> canceled_ = std::make_shared<bool>(false);
 };
 
-template <awaitable... Awaitables> class TupleGatherAwaiter {
+template <awaitable... Awaitables> class TupleTryGatherAwaiter {
 public:
     using ReturnType =
         std::tuple<void_to_monostate_t<awaitable_return_t<Awaitables>>...>;
 
-    explicit TupleGatherAwaiter(Awaitables &&...awaitables) noexcept
+    explicit TupleTryGatherAwaiter(Awaitables &&...awaitables) noexcept
         : awaitables_(keep_ref(std::forward<Awaitables>(awaitables))...) {}
 
 public:
-    TupleGatherAwaiter(const TupleGatherAwaiter &) = delete;
-    TupleGatherAwaiter &operator=(const TupleGatherAwaiter &) = delete;
+    TupleTryGatherAwaiter(const TupleTryGatherAwaiter &) = delete;
+    TupleTryGatherAwaiter &operator=(const TupleTryGatherAwaiter &) = delete;
 
-    TupleGatherAwaiter(TupleGatherAwaiter &&) = default;
-    TupleGatherAwaiter &operator=(TupleGatherAwaiter &&) = default;
+    TupleTryGatherAwaiter(TupleTryGatherAwaiter &&) = default;
+    TupleTryGatherAwaiter &operator=(TupleTryGatherAwaiter &&) = default;
 
-    ~TupleGatherAwaiter() { state_.cancel(); }
+    ~TupleTryGatherAwaiter() { state_.cancel(); }
 
 public:
     bool await_ready() const noexcept { return false; }
@@ -109,7 +110,7 @@ public:
     ReturnType await_resume() { return state_.unwrap_results(); }
 
 private:
-    using SharedState = TupleGatherSharedState<Awaitables...>;
+    using SharedState = TupleTryGatherSharedState<Awaitables...>;
 
     template <std::size_t I = 0, typename... Args>
     void launch_all_co_await(std::tuple<Args...> &args, SharedState &state) {
@@ -157,11 +158,11 @@ private:
     std::vector<corio::Lazy<void>> lazies_;
 };
 
-template <awaitable_iterable Iterable> class IterGatherAwaiter;
+template <awaitable_iterable Iterable> class IterTryGatherAwaiter;
 
-template <awaitable_iterable Iterable> class IterGatherSharedState {
+template <awaitable_iterable Iterable> class IterTryGatherSharedState {
 public:
-    using ReturnType = typename IterGatherAwaiter<Iterable>::ReturnType;
+    using ReturnType = typename IterTryGatherAwaiter<Iterable>::ReturnType;
 
     void init(std::size_t rest_count, std::coroutine_handle<> resume_handle,
               asio::strand<asio::any_io_executor> strand) noexcept {
@@ -215,23 +216,23 @@ private:
     std::shared_ptr<bool> canceled_ = std::make_shared<bool>(false);
 };
 
-template <awaitable_iterable Iterable> class IterGatherAwaiter {
+template <awaitable_iterable Iterable> class IterTryGatherAwaiter {
 public:
     using Awaitable = std::iter_value_t<Iterable>;
     using AwaitableReturn = awaitable_return_t<Awaitable>;
     using ReturnType = std::vector<void_to_monostate_t<AwaitableReturn>>;
 
-    explicit IterGatherAwaiter(Iterable &&iterable) noexcept
+    explicit IterTryGatherAwaiter(Iterable &&iterable) noexcept
         : iterable_(std::forward<Iterable>(iterable)) {}
 
 public:
-    IterGatherAwaiter(const IterGatherAwaiter &) = delete;
-    IterGatherAwaiter &operator=(const IterGatherAwaiter &) = delete;
+    IterTryGatherAwaiter(const IterTryGatherAwaiter &) = delete;
+    IterTryGatherAwaiter &operator=(const IterTryGatherAwaiter &) = delete;
 
-    IterGatherAwaiter(IterGatherAwaiter &&) = default;
-    IterGatherAwaiter &operator=(IterGatherAwaiter &&) = default;
+    IterTryGatherAwaiter(IterTryGatherAwaiter &&) = default;
+    IterTryGatherAwaiter &operator=(IterTryGatherAwaiter &&) = default;
 
-    ~IterGatherAwaiter() { state_.cancel(); }
+    ~IterTryGatherAwaiter() { state_.cancel(); }
 
 public:
     bool await_ready() const noexcept { return false; }
@@ -246,7 +247,7 @@ public:
     ReturnType await_resume() { return state_.unwrap_results(); }
 
 private:
-    using SharedState = IterGatherSharedState<Iterable>;
+    using SharedState = IterTryGatherSharedState<Iterable>;
 
     void launch_all_co_await() {
         std::size_t no = 0;
