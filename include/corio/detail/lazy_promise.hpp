@@ -6,6 +6,7 @@
 #include "corio/result.hpp"
 #include <asio.hpp>
 #include <coroutine>
+#include <functional>
 #include <optional>
 #include <type_traits>
 
@@ -43,6 +44,11 @@ public:
     template <detail::awaitable Awaitable>
     Awaitable &&await_transform(Awaitable &&awaitable) {
         return std::forward<Awaitable>(awaitable);
+    }
+
+    template <detail::awaitable T>
+    auto &await_transform(std::reference_wrapper<T> awaitable_ref) {
+        return awaitable_ref.get();
     }
 
 public:
