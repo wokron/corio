@@ -32,14 +32,12 @@ TEST_CASE("test any awaitable") {
 
         for (auto &a : v) {
             auto result = co_await a;
-            CHECK(std::get<int>(result) == 42);
+            CHECK(result == 42);
         }
 
-        CHECK(
-            std::holds_alternative<corio::Task<int>>(v[0].extract_awaitable()));
+        CHECK(std::holds_alternative<corio::Task<int>>(v[0].unwrap()));
         CHECK(!v[0]);
-        CHECK(
-            std::holds_alternative<corio::Lazy<int>>(v[1].extract_awaitable()));
+        CHECK(std::holds_alternative<corio::Lazy<int>>(v[1].unwrap()));
         CHECK(!v[1]);
     };
 

@@ -15,7 +15,7 @@ public:
     static_assert((!std::is_reference_v<Awaitables> && ...),
                   "Reference type is not allowed");
 
-    using ReturnType = detail::simplified_unique_safe_variant_t<
+    using ReturnType = detail::unique_safe_simplified_variant_t<
         detail::awaitable_return_t<Awaitables>...>;
 
     AnyAwaitable() = default;
@@ -56,7 +56,7 @@ public:
         return lazy_.value().operator co_await();
     }
 
-    std::variant<Awaitables...> extract_awaitable() {
+    std::variant<Awaitables...> unwrap() {
         return std::exchange(awaitable_, std::nullopt).value();
     }
 

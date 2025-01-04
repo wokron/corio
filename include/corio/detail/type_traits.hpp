@@ -45,19 +45,30 @@ template <awaiter Awaiter> struct awaitable_return<Awaiter> {
 template <awaitable Awaitable>
 using awaitable_return_t = typename awaitable_return<Awaitable>::type;
 
-template <typename... Ts>
-using safe_variant_t = std::variant<void_to_monostate_t<Ts>...>;
+template <template <typename...> typename Class, typename Tuple>
+struct apply_each;
 
-template <typename... Ts>
-using unique_safe_variant_t = unique_types_t<safe_variant_t<Ts...>>;
+template <template <typename...> typename Class, typename... Ts>
+struct apply_each<Class, std::tuple<Ts...>> {
+    using type = Class<Ts...>;
+};
+
+template <template <typename...> typename Class, typename Tuple>
+using apply_each_t = typename apply_each<Class, Tuple>::type;
 
 template <std::size_t I, typename... Ts>
 using at_position_t = std::tuple_element_t<I, std::tuple<Ts...>>;
 
 template <typename... Ts>
-using simplified_unique_safe_variant_t =
-    std::conditional_t<sizeof...(Ts) == 1,
-                       void_to_monostate_t<at_position_t<0, Ts...>>,
-                       unique_safe_variant_t<Ts...>>;
+using safe_variant_t = std::variant<void_to_monostate_t<Ts>...>;
+
+template <typename... Ts>
+using safe_simplified_variant_t =
+    std::conditional_t<sizeof...(Ts) == 1, at_position_t<0, Ts...>,
+                       safe_variant_t<Ts...>>;
+
+template <typename... Ts>
+using unique_safe_simplified_variant_t =
+    apply_each_t<safe_simplified_variant_t, unique_types_t<std::tuple<Ts...>>>;
 
 } // namespace corio::detail
