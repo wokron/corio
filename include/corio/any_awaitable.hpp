@@ -4,8 +4,6 @@
 #include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
 #include <optional>
-#include <type_traits>
-#include <utility>
 #include <variant>
 
 namespace corio {
@@ -32,33 +30,12 @@ public:
 
     operator bool() const { return awaitable_.has_value(); }
 
-    Lazy<ReturnType> do_co_await() {
-        return std::visit(
-            [](auto &&arg) -> Lazy<ReturnType> {
-                using Arg = std::decay_t<decltype(arg)>;
-                static_assert(detail::awaitable<Arg>, "Arg is not awaitable");
-                if constexpr (std::is_void_v<ReturnType>) {
-                    co_await arg;
-                    co_return;
-                } else if constexpr (std::is_void_v<
-                                         detail::awaitable_return_t<Arg>>) {
-                    co_await arg;
-                    co_return std::monostate{};
-                } else {
-                    co_return co_await arg;
-                }
-            },
-            *awaitable_);
-    }
+public:
+    Lazy<ReturnType> do_co_await();
 
-    auto operator co_await() {
-        lazy_ = do_co_await(); // Wrap everything in a Lazy
-        return lazy_.value().operator co_await();
-    }
+    auto operator co_await();
 
-    std::variant<Awaitables...> unwrap() {
-        return std::exchange(awaitable_, std::nullopt).value();
-    }
+    std::variant<Awaitables...> unwrap();
 
 private:
     std::optional<Lazy<ReturnType>> lazy_; // Keep the lifetime of the Lazy
@@ -66,3 +43,5 @@ private:
 };
 
 } // namespace corio
+
+#include "corio/impl/any_awaitable.ipp"
