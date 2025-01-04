@@ -34,8 +34,8 @@ TEST_CASE("test try gather") {
 
     SUBCASE("gather time") {
         auto entry = corio::try_gather(corio::this_coro::sleep(100us),
-                                   corio::this_coro::sleep(200us),
-                                   corio::this_coro::sleep(300us));
+                                       corio::this_coro::sleep(200us),
+                                       corio::this_coro::sleep(300us));
         asio::thread_pool pool(1);
         auto start = std::chrono::steady_clock::now();
         corio::block_on(pool.get_executor(), std::move(entry));
@@ -103,8 +103,8 @@ TEST_CASE("test try gather") {
             CHECK(!called1);
             CHECK(!called2);
 
-            CHECK_THROWS(
-                co_await corio::try_gather(t1, std::move(t2), exception_lazy()));
+            CHECK_THROWS(co_await corio::try_gather(t1, std::move(t2),
+                                                    exception_lazy()));
             co_await corio::this_coro::yield();
             CHECK(!called1);
             CHECK(called2);
@@ -224,5 +224,63 @@ TEST_CASE("test try gather iter") {
 
         asio::thread_pool pool(1);
         corio::block_on(pool.get_executor(), main());
+    }
+}
+
+TEST_CASE("test gather") {
+    SUBCASE("gather basic") {
+        auto f = []() -> corio::Lazy<int> { co_return 1; };
+        auto g = []() -> corio::Lazy<int> { co_return 2; };
+        auto h = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+        bool called = false;
+
+        auto entry = corio::gather(f(), g(), h(called));
+
+        asio::thread_pool pool(1);
+        auto [a, b, c] = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(a.result() == 1);
+        CHECK(b.result() == 2);
+        CHECK(called);
+        CHECK_NOTHROW(c.result());
+    }
+
+    SUBCASE("gather exception") {
+        auto f = []() -> corio::Lazy<int> {
+            throw std::runtime_error("error");
+            co_return 1;
+        };
+
+        auto sleep = corio::this_coro::sleep(300us);
+
+        auto entry = corio::gather(f(), sleep);
+        asio::thread_pool pool(1);
+
+        auto start = std::chrono::steady_clock::now();
+        auto [a, b] = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK_THROWS_AS(a.result(), std::runtime_error);
+        CHECK_NOTHROW(b.result());
+        auto end = std::chrono::steady_clock::now();
+
+        CHECK((end - start) >= 300us);
+    }
+
+    SUBCASE("gather move-only type") {
+        auto f = []() -> corio::Lazy<std::unique_ptr<int>> {
+            co_return std::make_unique<int>(1);
+        };
+        auto g = []() -> corio::Lazy<std::unique_ptr<double>> {
+            co_return std::make_unique<double>(2.34);
+        };
+        bool called = false;
+
+        auto entry = corio::gather(f(), g());
+
+        asio::thread_pool pool(1);
+        auto [a, b] = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(*a.result() == 1);
+        CHECK(*b.result() == 2.34);
     }
 }
