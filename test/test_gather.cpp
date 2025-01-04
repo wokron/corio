@@ -124,12 +124,12 @@ TEST_CASE("test try gather iter") {
     SUBCASE("gather iter basic") {
         auto f = [](int v) -> corio::Lazy<int> { co_return v; };
 
-        std::array<corio::Lazy<int>, 3> vec;
-        vec[0] = f(1);
-        vec[1] = f(2);
-        vec[2] = f(3);
+        std::array<corio::Lazy<int>, 3> arr;
+        arr[0] = f(1);
+        arr[1] = f(2);
+        arr[2] = f(3);
 
-        auto entry = corio::try_gather(vec);
+        auto entry = corio::try_gather(arr);
 
         asio::thread_pool pool(1);
         auto result = corio::block_on(pool.get_executor(), std::move(entry));
@@ -282,5 +282,77 @@ TEST_CASE("test gather") {
         auto [a, b] = corio::block_on(pool.get_executor(), std::move(entry));
         CHECK(*a.result() == 1);
         CHECK(*b.result() == 2.34);
+    }
+}
+
+TEST_CASE("test gather iter") {
+    SUBCASE("gather iter basic") {
+        auto f = [](int v) -> corio::Lazy<int> { co_return v; };
+
+        std::array<corio::Lazy<int>, 3> arr;
+        arr[0] = f(1);
+        arr[1] = f(2);
+        arr[2] = f(3);
+
+        auto entry = corio::gather(arr);
+
+        asio::thread_pool pool(1);
+        auto result = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(result.size() == 3);
+        CHECK(result[0].result() == 1);
+        CHECK(result[1].result() == 2);
+        CHECK(result[2].result() == 3);
+    }
+
+    SUBCASE("gather iter with exception") {
+        auto f = [](int v) -> corio::Lazy<int> {
+            if (v == 2) {
+                throw std::runtime_error("error");
+            }
+            co_return v;
+        };
+
+        std::vector<corio::Lazy<int>> vec;
+        vec.push_back(f(1));
+        vec.push_back(f(2));
+        vec.push_back(f(3));
+
+        auto entry = corio::gather(vec);
+
+        asio::thread_pool pool(1);
+        auto result = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(result.size() == 3);
+        CHECK(result[0].result() == 1);
+        CHECK_THROWS_AS(result[1].result(), std::runtime_error);
+        CHECK(result[2].result() == 3);
+    }
+
+    SUBCASE("gather with any awaitable") {
+        using T = corio::AnyAwaitable<corio::Task<void>, corio::Task<int>,
+                                      corio::Task<double>>;
+        auto f = []() -> corio::Lazy<int> { co_return 42; };
+        auto g = []() -> corio::Lazy<double> { co_return 2.34; };
+        auto h = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+
+        auto main = [&]() -> corio::Lazy<void> {
+            bool called = false;
+            std::vector<T> vec;
+            vec.push_back(co_await corio::spawn(f()));
+            vec.push_back(co_await corio::spawn(g()));
+            vec.push_back(co_await corio::spawn(h(called)));
+
+            auto result = co_await corio::gather(vec);
+            CHECK(result.size() == 3);
+            CHECK(std::get<int>(result[0].result()) == 42);
+            CHECK(std::get<double>(result[1].result()) == 2.34);
+            CHECK(called);
+            CHECK(std::holds_alternative<std::monostate>(result[2].result()));
+        };
+
+        asio::thread_pool pool(1);
+        corio::block_on(pool.get_executor(), main());
     }
 }

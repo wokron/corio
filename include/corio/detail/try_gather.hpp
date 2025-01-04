@@ -239,7 +239,7 @@ public:
 
     template <typename Promise>
     void await_suspend(std::coroutine_handle<Promise> handle) noexcept {
-        std::size_t total = std::distance(iterable_.begin(), iterable_.end());
+        std::size_t total = std::size(iterable_);
         state_.init(total, handle, handle.promise().strand());
         launch_all_co_await();
     }
