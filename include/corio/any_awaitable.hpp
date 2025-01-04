@@ -19,7 +19,7 @@ public:
     AnyAwaitable() = default;
 
     template <detail::awaitable Awaitable>
-    explicit AnyAwaitable(Awaitable &&awaitable)
+    AnyAwaitable(Awaitable &&awaitable)
         : awaitable_(std::forward<Awaitable>(awaitable)) {}
 
     template <detail::awaitable Awaitable>
@@ -38,8 +38,9 @@ public:
     std::variant<Awaitables...> unwrap();
 
 private:
-    std::optional<Lazy<ReturnType>> lazy_; // Keep the lifetime of the Lazy
-    std::optional<std::variant<Awaitables...>> awaitable_;
+    // Keep the lifetime of the Lazy
+    std::optional<Lazy<ReturnType>> lazy_ = std::nullopt;
+    std::optional<std::variant<Awaitables...>> awaitable_ = std::nullopt;
 };
 
 } // namespace corio

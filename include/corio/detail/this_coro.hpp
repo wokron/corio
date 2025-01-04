@@ -50,6 +50,8 @@ struct YieldAwaiter {
     YieldAwaiter() = default;
     YieldAwaiter(const YieldAwaiter &) = delete;
     YieldAwaiter &operator=(const YieldAwaiter &) = delete;
+    YieldAwaiter(YieldAwaiter &&) = default;
+    YieldAwaiter &operator=(YieldAwaiter &&) = default;
 
     bool await_ready() const noexcept { return false; }
 
@@ -68,7 +70,11 @@ struct YieldAwaiter {
 
     void await_resume() noexcept {}
 
-    ~YieldAwaiter() { *cancelled = true; }
+    ~YieldAwaiter() {
+        if (cancelled != nullptr) {
+            *cancelled = true;
+        }
+    }
 
     std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
 };
@@ -78,6 +84,8 @@ template <typename Rep, typename Period> struct SleepAwaiter {
         : duration(duration) {}
     SleepAwaiter(const SleepAwaiter &) = delete;
     SleepAwaiter &operator=(const SleepAwaiter &) = delete;
+    SleepAwaiter(SleepAwaiter &&) = default;
+    SleepAwaiter &operator=(SleepAwaiter &&) = default;
 
     bool await_ready() const noexcept { return false; }
 
@@ -96,7 +104,11 @@ template <typename Rep, typename Period> struct SleepAwaiter {
 
     void await_resume() noexcept {}
 
-    ~SleepAwaiter() { timer.value().cancel(); }
+    ~SleepAwaiter() {
+        if (timer.has_value()) {
+            timer.value().cancel();
+        }
+    }
 
     std::chrono::duration<Rep, Period> duration;
     std::optional<asio::steady_timer> timer;
@@ -107,6 +119,8 @@ struct SwitchExecutorAwaiter {
         : executor(executor) {}
     SwitchExecutorAwaiter(const SwitchExecutorAwaiter &) = delete;
     SwitchExecutorAwaiter &operator=(const SwitchExecutorAwaiter &) = delete;
+    SwitchExecutorAwaiter(SwitchExecutorAwaiter &&) = default;
+    SwitchExecutorAwaiter &operator=(SwitchExecutorAwaiter &&) = default;
 
     bool await_ready() const noexcept { return false; }
 
