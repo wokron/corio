@@ -35,4 +35,20 @@ TEST_CASE("test runner") {
         auto result = corio::run(f());
         CHECK(result == 120);
     }
+
+    SUBCASE("test block_no with common awaiter") {
+        asio::thread_pool pool(1);
+
+        auto sleep = corio::this_coro::sleep(10us);
+
+        auto start = std::chrono::high_resolution_clock::now();
+
+        corio::block_on(pool.get_executor(), sleep);
+        corio::block_on(pool.get_executor(), sleep);
+        corio::block_on(pool.get_executor(), std::move(sleep));
+
+        auto end = std::chrono::high_resolution_clock::now();
+
+        CHECK((end - start) >= 30us);
+    }
 }

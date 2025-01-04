@@ -24,13 +24,15 @@ private:
     asio::thread_pool pool_;
 };
 
-template <typename T>
-Lazy<void> launch_with_future(Lazy<T> lazy, std::promise<T> promise) {
-    if constexpr (std::is_void_v<T>) {
-        co_await lazy;
+template <detail::awaitable Awaitable,
+          typename Return = detail::awaitable_return_t<Awaitable>>
+Lazy<void> launch_with_future(Awaitable &&awaitable,
+                              std::promise<Return> promise) {
+    if constexpr (std::is_void_v<Return>) {
+        co_await awaitable;
         promise.set_value();
     } else {
-        promise.set_value(co_await lazy);
+        promise.set_value(co_await awaitable);
     }
 }
 
@@ -41,18 +43,19 @@ inline asio::any_io_executor get_default_executor() noexcept {
     return detail::DefaultExecutor::get().get_executor();
 }
 
-template <typename T>
-inline T block_on(asio::any_io_executor executor, Lazy<T> lazy) {
-    std::promise<T> promise;
-    std::future<T> future = promise.get_future();
-    Task<void> task =
-        spawn(executor,
-              detail::launch_with_future(std::move(lazy), std::move(promise)));
+template <detail::awaitable Awaitable, typename Return>
+inline Return block_on(asio::any_io_executor executor, Awaitable &&awaitable) {
+    std::promise<Return> promise;
+    std::future<Return> future = promise.get_future();
+    Task<void> task = spawn(
+        executor, detail::launch_with_future(std::forward<Awaitable>(awaitable),
+                                             std::move(promise)));
     return future.get();
 }
 
-template <typename T> inline T run(Lazy<T> lazy) {
-    return block_on(get_default_executor(), std::move(lazy));
+template <detail::awaitable Awaitable, typename Return>
+inline Return run(Awaitable &&awaitable) {
+    return block_on(get_default_executor(), std::forward<Awaitable>(awaitable));
 }
 
 } // namespace corio
