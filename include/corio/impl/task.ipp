@@ -3,6 +3,7 @@
 #include "corio/exceptions.hpp"
 #include "corio/task.hpp"
 #include "corio/this_coro.hpp"
+#include <memory>
 
 namespace corio {
 
@@ -20,6 +21,7 @@ template <typename T> Task<T> &Task<T>::operator=(Task &&other) noexcept {
         return *this;
     }
     state_ = std::move(other.state_);
+    abort_guard_ = std::exchange(other.abort_guard_, false);
     return *this;
 }
 
@@ -86,7 +88,7 @@ public:
         }
 
         auto strand = state_->entry().get_strand();
-        state_->set_resumer(strand, handle);
+        state_->set_resumer(strand, handle, canceled_);
 
         return true;
     }
@@ -109,8 +111,15 @@ public:
         }
     }
 
+    ~TaskAwaiter() {
+        if (canceled_ != nullptr) {
+            *canceled_ = true;
+        }
+    }
+
 private:
     std::shared_ptr<SharedState> state_;
+    std::shared_ptr<bool> canceled_ = std::make_shared<bool>(false);
 };
 
 template <typename T> TaskAwaiter<T> Task<T>::operator co_await() const {

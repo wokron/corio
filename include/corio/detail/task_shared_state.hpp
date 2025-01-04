@@ -69,14 +69,21 @@ public:
             return false;
         }
         auto &resumer = resumer_.value();
-        asio::post(resumer.strand_, [h = resumer.handle_] { h.resume(); });
+        auto do_resume = [h = resumer.handle_, c = resumer.canceled_] {
+            bool is_canceled = *c;
+            if (!is_canceled) {
+                h.resume();
+            }
+        };
+        asio::post(resumer.strand_, do_resume);
         resumer_ = std::nullopt;
         return true;
     }
 
     void set_resumer(const asio::strand<asio::any_io_executor> &strand,
-                     std::coroutine_handle<> handle) {
-        resumer_ = Resumer{strand, handle};
+                     std::coroutine_handle<> handle,
+                     std::shared_ptr<bool> canceled) {
+        resumer_ = Resumer{strand, handle, canceled};
     }
 
 private:
@@ -90,6 +97,7 @@ private:
     struct Resumer {
         asio::strand<asio::any_io_executor> strand_;
         std::coroutine_handle<> handle_;
+        std::shared_ptr<bool> canceled_;
     };
     std::optional<Resumer> resumer_;
 };

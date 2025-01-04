@@ -28,11 +28,15 @@ template <detail::awaitable Awaitable,
           typename Return = detail::awaitable_return_t<Awaitable>>
 Lazy<void> launch_with_future(Awaitable &&awaitable,
                               std::promise<Return> promise) {
-    if constexpr (std::is_void_v<Return>) {
-        co_await awaitable;
-        promise.set_value();
-    } else {
-        promise.set_value(co_await awaitable);
+    try {
+        if constexpr (std::is_void_v<Return>) {
+            co_await awaitable;
+            promise.set_value();
+        } else {
+            promise.set_value(co_await awaitable);
+        }
+    } catch (...) {
+        promise.set_exception(std::current_exception());
     }
 }
 
