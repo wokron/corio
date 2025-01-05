@@ -30,6 +30,13 @@ inline void handle_warning(const std::string &expr, std::source_location loc,
     std::cerr << std::endl;
 }
 
+#ifdef NDEBUG
+
+#define CORIO_DEBUG(expr, ...) ((void)0)
+#define CORIO_ASSERT(expr, ...) ((void)0)
+
+#else
+
 #define CORIO_ASSERT(expr, ...)                                                \
     do {                                                                       \
         if (!(expr)) {                                                         \
@@ -45,5 +52,7 @@ inline void handle_warning(const std::string &expr, std::source_location loc,
                 #expr, std::source_location::current(), ##__VA_ARGS__);        \
         }                                                                      \
     } while (false)
+
+#endif
 
 } // namespace corio::detail

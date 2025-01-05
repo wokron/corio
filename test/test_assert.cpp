@@ -15,6 +15,8 @@ void assert_success() { CORIO_ASSERT(true); }
 
 } // namespace
 
+#ifndef NDEBUG
+
 TEST_CASE("test assert") {
     CHECK_THROWS_AS(assert_fail1(), corio::AssertionError);
     CHECK_THROWS_AS(assert_fail2(), corio::AssertionError);
@@ -22,3 +24,5 @@ TEST_CASE("test assert") {
     CHECK_THROWS_AS(assert_fail4(), corio::AssertionError);
     CHECK_NOTHROW(assert_success());
 }
+
+#endif
