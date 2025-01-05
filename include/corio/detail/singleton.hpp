@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -7,11 +8,9 @@ namespace corio::detail {
 
 template <typename T> class LazySingleton {
 public:
-    template <typename... Args> static void init(Args &&...args) {
+    static void init(std::function<std::unique_ptr<T>()> factory) {
         static std::once_flag flag;
-        std::call_once(flag, [&] {
-            instance_ = std::make_unique<T>(std::forward<Args>(args)...);
-        });
+        std::call_once(flag, [&] { instance_ = factory(); });
     }
 
     static T &get() noexcept { return *instance_; }

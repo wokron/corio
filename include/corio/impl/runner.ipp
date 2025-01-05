@@ -43,7 +43,10 @@ Lazy<void> launch_with_future(Awaitable &&awaitable,
 } // namespace detail
 
 inline asio::any_io_executor get_default_executor() noexcept {
-    detail::DefaultExecutor::init(16); // TODO: Need to pass a lambda to init
+    detail::DefaultExecutor::init([] {
+        const auto processor_count = std::thread::hardware_concurrency();
+        return std::make_unique<detail::DefaultExecutor>(processor_count);
+    });
     return detail::DefaultExecutor::get().get_executor();
 }
 
