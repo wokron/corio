@@ -2,7 +2,7 @@
 
 #include "corio/detail/assert.hpp"
 #include "corio/detail/concepts.hpp"
-#include "corio/detail/this_coro.hpp"
+#include "corio/detail/promise_base.hpp"
 #include "corio/result.hpp"
 #include <asio.hpp>
 #include <coroutine>
@@ -28,29 +28,7 @@ struct FinalAwaiter {
     bool ready = false;
 };
 
-class LazyPromiseBase {
-public:
-    this_coro::detail::ExecutorAwaiter
-    await_transform(const this_coro::detail::ExecutorPlaceholder &) {
-        return {.executor = executor_};
-    }
-
-    this_coro::detail::StrandAwaiter
-    await_transform(const this_coro::detail::StrandPlaceholder &) {
-        CORIO_ASSERT(strand_.has_value(), "The strand is not set");
-        return {.strand = strand_.value()};
-    }
-
-    template <detail::awaitable Awaitable>
-    Awaitable &&await_transform(Awaitable &&awaitable) {
-        return std::forward<Awaitable>(awaitable);
-    }
-
-    template <detail::awaitable T>
-    auto &await_transform(std::reference_wrapper<T> awaitable_ref) {
-        return awaitable_ref.get();
-    }
-
+class LazyPromiseBase : public PromiseBase {
 public:
     std::suspend_always initial_suspend() { return {}; }
     FinalAwaiter final_suspend() noexcept { return {destroy_when_exit_}; }
@@ -66,28 +44,9 @@ public:
         destroy_when_exit_ = destroy_when_exit;
     }
 
-    void set_executor(asio::any_io_executor executor) {
-        executor_ = executor;
-        strand_ = asio::make_strand(executor_);
-    }
-
-    const asio::any_io_executor &executor() const { return executor_; }
-
-    void set_strand(asio::strand<asio::any_io_executor> strand) {
-        strand_ = strand;
-        executor_ = strand.get_inner_executor();
-    }
-
-    const asio::strand<asio::any_io_executor> &strand() const {
-        CORIO_ASSERT(strand_.has_value(), "The strand is not set");
-        return strand_.value();
-    }
-
 private:
     std::coroutine_handle<> caller_handle_ = nullptr;
     bool destroy_when_exit_ = false;
-    asio::any_io_executor executor_;
-    std::optional<asio::strand<asio::any_io_executor>> strand_;
 };
 
 template <typename T> class LazyPromise : public LazyPromiseBase {

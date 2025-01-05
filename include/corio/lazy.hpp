@@ -83,7 +83,7 @@ public:
     std::coroutine_handle<promise_type>
     chain_coroutine(std::coroutine_handle<PromiseType> caller_handle);
 
-    LazyAwaiter<T> operator co_await();
+    auto operator co_await();
 
 private:
     std::coroutine_handle<promise_type> handle_;

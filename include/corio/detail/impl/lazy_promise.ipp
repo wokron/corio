@@ -11,7 +11,7 @@ inline std::coroutine_handle<> FinalAwaiter::await_suspend(
     auto &promise = handle.promise();
     auto caller_handle = promise.caller_handle();
     if (caller_handle) {
-        return caller_handle; // TODO: update executor
+        return caller_handle;
     }
     return std::noop_coroutine();
 }

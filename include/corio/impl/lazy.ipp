@@ -8,8 +8,7 @@ namespace corio {
 template <typename T>
 inline Lazy<T> &Lazy<T>::operator=(Lazy<T> &&other) noexcept {
     if (this != &other) {
-        handle_ = other.handle_;
-        other.handle_ = nullptr;
+        handle_ = std::exchange(other.handle_, nullptr);
     }
     return *this;
 }
@@ -65,6 +64,8 @@ Lazy<T>::chain_coroutine(std::coroutine_handle<PromiseType> caller_handle) {
     return handle_;
 }
 
+namespace detail {
+
 template <typename T> class LazyAwaiter {
 public:
     explicit LazyAwaiter(Lazy<T> &lazy) : lazy_(lazy) {}
@@ -97,8 +98,10 @@ private:
     std::function<void(asio::strand<asio::any_io_executor>)> update_strand_;
 };
 
-template <typename T> inline LazyAwaiter<T> Lazy<T>::operator co_await() {
-    return LazyAwaiter<T>(*this);
+} // namespace detail
+
+template <typename T> inline auto Lazy<T>::operator co_await() {
+    return detail::LazyAwaiter<T>(*this);
 }
 
 } // namespace corio
