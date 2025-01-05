@@ -8,11 +8,8 @@
 namespace corio::detail {
 
 template <typename T>
-using void_to_monostate =
-    std::conditional<std::is_void_v<T>, std::monostate, T>;
-
-template <typename T>
-using void_to_monostate_t = typename void_to_monostate<T>::type;
+using void_to_monostate_t =
+    std::conditional_t<std::is_void_v<T>, std::monostate, T>;
 
 template <typename T, typename... Ts> struct unique_types_impl {
     using type = T;

@@ -52,9 +52,9 @@ private:
     std::exception_ptr first_exception_;
 };
 
-template <typename T>
-using unwrap_and_return_and_monostate =
-    void_to_monostate<awaitable_return_t<unwrap_reference_t<T>>>;
+template <typename T> struct unwrap_and_return_and_monostate {
+    using type = void_to_monostate_t<awaitable_return_t<unwrap_reference_t<T>>>;
+};
 
 template <typename Tuple> class TupleTryGatherCollectHandler {
 public:
