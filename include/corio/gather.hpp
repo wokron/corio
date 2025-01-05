@@ -6,10 +6,25 @@
 
 namespace corio {
 
+namespace detail {
+
+template <typename T> auto keep_ref(T &&value) {
+    if constexpr (std::is_lvalue_reference_v<T>) {
+        return std::ref(value);
+    } else {
+        return value;
+    }
+}
+
+} // namespace detail
+
 template <detail::awaitable... Awaitables>
 auto gather(Awaitables &&...awaitables) noexcept {
-    return detail::TupleGatherAwaiter<Awaitables...>(
-        std::forward<Awaitables>(awaitables)...);
+    auto awaitables_tuple = std::make_tuple(
+        detail::keep_ref(std::forward<Awaitables>(awaitables))...);
+    using Tuple = decltype(awaitables_tuple);
+
+    return detail::TupleGatherAwaiter<Tuple>(std::move(awaitables_tuple));
 }
 
 template <detail::awaitable_iterable Iterable>
@@ -20,8 +35,11 @@ auto gather(Iterable &&iterable) noexcept {
 
 template <detail::awaitable... Awaitables>
 auto try_gather(Awaitables &&...awaitables) noexcept {
-    return detail::TupleTryGatherAwaiter<Awaitables...>(
-        std::forward<Awaitables>(awaitables)...);
+    auto awaitables_tuple = std::make_tuple(
+        detail::keep_ref(std::forward<Awaitables>(awaitables))...);
+    using Tuple = decltype(awaitables_tuple);
+
+    return detail::TupleTryGatherAwaiter<Tuple>(std::move(awaitables_tuple));
 }
 
 template <detail::awaitable_iterable Iterable>

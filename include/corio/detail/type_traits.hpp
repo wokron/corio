@@ -8,8 +8,11 @@
 namespace corio::detail {
 
 template <typename T>
-using void_to_monostate_t =
-    std::conditional_t<std::is_void_v<T>, std::monostate, T>;
+using void_to_monostate =
+    std::conditional<std::is_void_v<T>, std::monostate, T>;
+
+template <typename T>
+using void_to_monostate_t = typename void_to_monostate<T>::type;
 
 template <typename T, typename... Ts> struct unique_types_impl {
     using type = T;
@@ -70,5 +73,27 @@ using safe_simplified_variant_t =
 template <typename... Ts>
 using unique_safe_simplified_variant_t =
     apply_each_t<safe_simplified_variant_t, unique_types_t<std::tuple<Ts...>>>;
+
+template <typename Tuple, template <typename> typename Trait>
+struct transform_tuple;
+
+template <template <typename> typename Trait, typename... Ts>
+struct transform_tuple<std::tuple<Ts...>, Trait> {
+    using type = std::tuple<typename Trait<Ts>::type...>;
+};
+
+template <typename Tuple, template <typename> typename Trait>
+using transform_tuple_t = typename transform_tuple<Tuple, Trait>::type;
+
+template <typename Ref> struct unwrap_reference {
+    using type = Ref;
+};
+
+template <typename T> struct unwrap_reference<std::reference_wrapper<T>> {
+    using type = T;
+};
+
+template <typename Ref>
+using unwrap_reference_t = typename unwrap_reference<Ref>::type;
 
 } // namespace corio::detail
