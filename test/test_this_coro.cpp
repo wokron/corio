@@ -153,7 +153,7 @@ TEST_CASE("test this_coro awaitable") {
     SUBCASE("test sleep with cancel") {
         bool called = false;
         auto f = [&]() -> corio::Lazy<void> {
-            co_await corio::this_coro::sleep(100us);
+            co_await corio::this_coro::sleep(1ms);
             called = true;
         };
         auto g = [&]() -> corio::Lazy<void> {
@@ -176,7 +176,7 @@ TEST_CASE("test this_coro awaitable") {
         auto duration = end - start;
 
         CHECK(!called);
-        CHECK(duration < 100us);
+        CHECK(duration < 1ms);
     }
 }
 

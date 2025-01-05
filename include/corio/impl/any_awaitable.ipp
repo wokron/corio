@@ -7,7 +7,7 @@ namespace corio {
 
 template <detail::awaitable... Awaitables>
 Lazy<typename AnyAwaitable<Awaitables...>::ReturnType>
-AnyAwaitable<Awaitables...>::do_co_await() {
+AnyAwaitable<Awaitables...>::do_co_await_() {
     return std::visit(
         [](auto &&arg) -> Lazy<ReturnType> {
             using Arg = std::decay_t<decltype(arg)>;
@@ -28,7 +28,7 @@ AnyAwaitable<Awaitables...>::do_co_await() {
 
 template <detail::awaitable... Awaitables>
 auto AnyAwaitable<Awaitables...>::operator co_await() {
-    lazy_ = do_co_await(); // Wrap everything in a Lazy
+    lazy_ = do_co_await_(); // Wrap everything in a Lazy
     return lazy_.value().operator co_await();
 }
 

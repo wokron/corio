@@ -1,7 +1,6 @@
 #pragma once
 
 #include "corio/detail/concepts.hpp"
-#include <cstddef>
 #include <type_traits>
 #include <variant>
 

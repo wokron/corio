@@ -37,9 +37,7 @@ public:
 
     Task &operator=(Task const &) = delete;
 
-    Task(Task &&other) noexcept
-        : state_(std::move(other.state_)),
-          abort_guard_(std::exchange(other.abort_guard_, false)) {}
+    Task(Task &&other) noexcept = default;
 
     Task &operator=(Task &&other) noexcept;
 

@@ -43,7 +43,7 @@ Lazy<void> launch_with_future(Awaitable &&awaitable,
 } // namespace detail
 
 inline asio::any_io_executor get_default_executor() noexcept {
-    detail::DefaultExecutor::init(16);
+    detail::DefaultExecutor::init(16); // TODO: Need to pass a lambda to init
     return detail::DefaultExecutor::get().get_executor();
 }
 

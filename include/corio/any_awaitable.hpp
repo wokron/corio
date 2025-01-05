@@ -31,13 +31,13 @@ public:
     operator bool() const { return awaitable_.has_value(); }
 
 public:
-    Lazy<ReturnType> do_co_await();
-
     auto operator co_await();
 
     std::variant<Awaitables...> unwrap();
 
 private:
+    Lazy<ReturnType> do_co_await_();
+
     // Keep the lifetime of the Lazy
     std::optional<Lazy<ReturnType>> lazy_ = std::nullopt;
     std::optional<std::variant<Awaitables...>> awaitable_ = std::nullopt;
