@@ -180,17 +180,21 @@ TEST_CASE("test this_coro awaitable") {
     }
 }
 
+[[clang::optnone]] std::thread::id get_tid() {
+    return std::this_thread::get_id();
+}
+
 TEST_CASE("test this_coro run_on") {
     asio::thread_pool pool1(1), pool2(1);
     bool called = false;
     auto f = [&]() -> corio::Lazy<void> {
-        auto id1 = std::this_thread::get_id();
+        auto id1 = get_tid();
         co_await corio::this_coro::run_on(pool2.get_executor());
-        auto id2 = std::this_thread::get_id();
+        auto id2 = get_tid();
         co_await corio::this_coro::run_on(pool1.get_executor());
-        auto id3 = std::this_thread::get_id();
+        auto id3 = get_tid();
         co_await corio::this_coro::run_on(pool2.get_executor());
-        auto id4 = std::this_thread::get_id();
+        auto id4 = get_tid();
         CHECK(id1 != id2);
         CHECK(id1 == id3);
         CHECK(id2 == id4);

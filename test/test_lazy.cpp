@@ -126,6 +126,11 @@ struct CancelableSimpleAwaiter {
     std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
 };
 
+// Fix https://github.com/llvm/llvm-project/issues/47177
+[[clang::optnone]] std::thread::id get_tid() {
+    return std::this_thread::get_id();
+}
+
 } // namespace
 
 TEST_CASE("test lazy") {
@@ -304,9 +309,9 @@ TEST_CASE("test lazy") {
 
         bool called = false;
         auto f = [&](bool &called) -> corio::Lazy<void> {
-            auto id1 = std::this_thread::get_id(); // In io1
+            auto id1 = get_tid(); // In io1
             co_await ChangeExecutorAwaiter{io2.get_executor()};
-            auto id2 = std::this_thread::get_id(); // In io2
+            auto id2 = get_tid(); // In io2
             CHECK(id1 != id2);
             called = true;
             co_return;
