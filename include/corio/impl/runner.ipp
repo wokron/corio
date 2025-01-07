@@ -1,10 +1,9 @@
 #pragma once
 
-#include "asio/any_io_executor.hpp"
-#include "asio/thread_pool.hpp"
 #include "corio/detail/singleton.hpp"
 #include "corio/runner.hpp"
 #include "corio/task.hpp"
+#include <asio.hpp>
 #include <future>
 #include <type_traits>
 
