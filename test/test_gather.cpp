@@ -198,8 +198,7 @@ TEST_CASE("test try gather iter") {
     }
 
     SUBCASE("gather with any awaitable") {
-        using T = corio::AnyAwaitable<corio::Task<void>, corio::Task<int>,
-                                      corio::Task<double>>;
+        using T = corio::AnyAwaitable<void, int, double>;
         auto f = []() -> corio::Lazy<int> { co_return 42; };
         auto g = []() -> corio::Lazy<double> { co_return 2.34; };
         auto h = [](bool &called) -> corio::Lazy<void> {
@@ -328,8 +327,7 @@ TEST_CASE("test gather iter") {
     }
 
     SUBCASE("gather with any awaitable") {
-        using T = corio::AnyAwaitable<corio::Task<void>, corio::Task<int>,
-                                      corio::Task<double>>;
+        using T = corio::AnyAwaitable<void, int, double>;
         auto f = []() -> corio::Lazy<int> { co_return 42; };
         auto g = []() -> corio::Lazy<double> { co_return 2.34; };
         auto h = [](bool &called) -> corio::Lazy<void> {

@@ -161,9 +161,8 @@ TEST_CASE("test select iter") {
         };
 
         auto g = [&]() -> corio::Lazy<void> {
-            using T =
-                corio::AnyAwaitable<corio::Task<void>,
-                                    decltype(corio::this_coro::sleep(1us))>;
+            using T = corio::AnyAwaitable<void>;
+
             std::vector<T> vec;
             std::array<bool, 10> flags;
             for (int i = 0; i < 10; i++) {

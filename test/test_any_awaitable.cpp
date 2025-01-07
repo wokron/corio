@@ -11,11 +11,8 @@
 #include <vector>
 
 TEST_CASE("test any awaitable") {
-
     SUBCASE("any awaitable basic") {
-        using AnyAwaitableType =
-            corio::AnyAwaitable<corio::Lazy<int>, corio::Task<int>>;
-        static_assert(corio::detail::awaitable<AnyAwaitableType>);
+        using AnyAwaitableType = corio::AnyAwaitable<int>;
 
         auto f = [&]() -> corio::Lazy<int> { co_return 42; };
 
@@ -38,22 +35,11 @@ TEST_CASE("test any awaitable") {
                 auto result = co_await a;
                 CHECK(result == 42);
             }
-
-            CHECK(std::holds_alternative<corio::Task<int>>(v[0].unwrap()));
-            CHECK(!v[0]);
-            CHECK(std::holds_alternative<corio::Lazy<int>>(v[1].unwrap()));
-            CHECK(!v[1]);
         };
-
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), g());
     }
 
     SUBCASE("all void") {
-        using AnyAwaitableType =
-            corio::AnyAwaitable<corio::Lazy<void>,
-                                decltype(corio::this_coro::yield())>;
-        static_assert(corio::detail::awaitable<AnyAwaitableType>);
+        using AnyAwaitableType = corio::AnyAwaitable<void, void>;
 
         auto f = [&]() -> corio::Lazy<void> { co_return; };
         AnyAwaitableType a1 = f();
@@ -76,11 +62,30 @@ TEST_CASE("test any awaitable") {
         CHECK(called);
     }
 
-    SUBCASE("difference return type") {
-        using AnyAwaitableType =
-            corio::AnyAwaitable<corio::Lazy<int>, corio::Lazy<double>,
-                                corio::Task<double>>;
-        static_assert(corio::detail::awaitable<AnyAwaitableType>);
+    SUBCASE("void with other type") {
+        using AnyAwaitableType = corio::AnyAwaitable<void, int>;
+
+        auto f = [&]() -> corio::Lazy<void> { co_return; };
+        auto g = [&]() -> corio::Lazy<int> { co_return 42; };
+
+        AnyAwaitableType a1 = f();
+        AnyAwaitableType a2 = g();
+
+        bool called = false;
+        auto h = [&]() -> corio::Lazy<void> {
+            co_await a1;
+            auto r = co_await a2;
+            CHECK(std::get<int>(r) == 42);
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+        corio::block_on(pool.get_executor(), h());
+        CHECK(called);
+    }
+
+    SUBCASE("different return type") {
+        using AnyAwaitableType = corio::AnyAwaitable<int, double, double>;
 
         auto f = [&]() -> corio::Lazy<int> { co_return 42; };
         auto g = [&]() -> corio::Lazy<double> { co_return 3.14; };

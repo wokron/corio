@@ -1,41 +1,54 @@
 #pragma once
 
 #include "corio/any_awaitable.hpp"
+#include "corio/detail/assert.hpp"
 #include <utility>
 
 namespace corio {
 
-template <detail::awaitable... Awaitables>
-Lazy<typename AnyAwaitable<Awaitables...>::ReturnType>
-AnyAwaitable<Awaitables...>::do_co_await_() {
-    return std::visit(
-        [](auto &&arg) -> Lazy<ReturnType> {
-            using Arg = std::decay_t<decltype(arg)>;
-            static_assert(detail::awaitable<Arg>, "Arg is not awaitable");
-            if constexpr (std::is_void_v<ReturnType>) {
-                co_await arg;
-                co_return;
-            } else if constexpr (std::is_void_v<
-                                     detail::awaitable_return_t<Arg>>) {
-                co_await arg;
-                co_return std::monostate{};
-            } else {
-                co_return co_await arg;
-            }
-        },
-        *awaitable_);
+template <typename... Return>
+template <detail::awaitable Awaitable>
+AnyAwaitable<Return...>::AnyAwaitable(Awaitable &&awaitable) {
+    if constexpr (std::is_lvalue_reference_v<Awaitable>) {
+        // If pass by reference, any awaitable will not take the ownership
+        self_ = &awaitable;
+    } else {
+        // If pass by value, any awaitable will take the ownership
+        self_ = make_void_unique_ptr_(std::forward<Awaitable>(awaitable));
+    }
+    invoker_ = [](void *self) -> Lazy<ReturnType> {
+        constexpr bool need_monostate =
+            std::is_void_v<detail::awaitable_return_t<Awaitable>> &&
+            !std::is_void_v<ReturnType>;
+
+        auto &self_ref = *reinterpret_cast<Awaitable *>(self);
+        if constexpr (need_monostate) {
+            co_await self_ref;
+            co_return std::monostate{};
+        } else {
+            co_return co_await self_ref;
+        }
+    };
 }
 
-template <detail::awaitable... Awaitables>
-auto AnyAwaitable<Awaitables...>::operator co_await() {
-    lazy_ = do_co_await_(); // Wrap everything in a Lazy
-    return lazy_.value().operator co_await();
+template <typename... Return>
+auto AnyAwaitable<Return...>::operator co_await() {
+    CORIO_ASSERT(self_.index() != 0, "Invalid state");
+    if (auto *self_ptr = std::get_if<void *>(&self_)) {
+        lazy_ = invoker_(*self_ptr);
+    } else {
+        auto &self = std::get<std::unique_ptr<void, Deleter>>(self_);
+        lazy_ = invoker_(self.get());
+    }
+    return lazy_->operator co_await();
 }
 
-template <detail::awaitable... Awaitables>
-std::variant<Awaitables...> AnyAwaitable<Awaitables...>::unwrap() {
-    lazy_ = std::nullopt;
-    return std::exchange(awaitable_, std::nullopt).value();
+template <typename... Return>
+template <detail::awaitable Awaitable>
+auto AnyAwaitable<Return...>::make_void_unique_ptr_(Awaitable &&awaitable) {
+    auto deleter = [](void *ptr) { delete reinterpret_cast<Awaitable *>(ptr); };
+    return std::unique_ptr<void, Deleter>(
+        new Awaitable(std::forward<Awaitable>(awaitable)), deleter);
 }
 
 } // namespace corio

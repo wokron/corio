@@ -1,46 +1,37 @@
 #pragma once
 
+#include "corio/detail/assert.hpp"
 #include "corio/detail/concepts.hpp"
 #include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
+#include <memory>
 #include <optional>
 #include <variant>
 
 namespace corio {
 
-template <detail::awaitable... Awaitables> class AnyAwaitable {
+template <typename... Return> class AnyAwaitable {
 public:
-    static_assert((!std::is_reference_v<Awaitables> && ...),
-                  "Reference type is not allowed");
-
-    using ReturnType = detail::unique_safe_simplified_variant_t<
-        detail::awaitable_return_t<Awaitables>...>;
+    using ReturnType = detail::unique_safe_simplified_variant_t<Return...>;
 
     AnyAwaitable() = default;
 
-    template <detail::awaitable Awaitable>
-    AnyAwaitable(Awaitable &&awaitable)
-        : awaitable_(std::forward<Awaitable>(awaitable)) {}
+    template <detail::awaitable Awaitable> AnyAwaitable(Awaitable &&awaitable);
 
-    template <detail::awaitable Awaitable>
-    AnyAwaitable &operator=(Awaitable &&awaitable) {
-        awaitable_ = std::forward<Awaitable>(awaitable);
-        return *this;
-    }
+    operator bool() const { return self_.index() != 0; }
 
-    operator bool() const { return awaitable_.has_value(); }
-
-public:
     auto operator co_await();
 
-    std::variant<Awaitables...> unwrap();
-
 private:
-    Lazy<ReturnType> do_co_await_();
+    using Deleter = void (*)(void *);
+    using Invoker = Lazy<ReturnType> (*)(void *self);
 
-    // Keep the lifetime of the Lazy
+    template <detail::awaitable Awaitable>
+    static auto make_void_unique_ptr_(Awaitable &&awaitable);
+
+    std::variant<std::monostate, std::unique_ptr<void, Deleter>, void *> self_;
+    Invoker invoker_;
     std::optional<Lazy<ReturnType>> lazy_ = std::nullopt;
-    std::optional<std::variant<Awaitables...>> awaitable_ = std::nullopt;
 };
 
 } // namespace corio
