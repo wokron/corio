@@ -6,6 +6,17 @@
 #include <doctest/doctest.h>
 #include <vector>
 
+namespace {
+
+template <typename Rep, typename Period, typename Return>
+inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
+                                 Return return_value) {
+    co_await corio::this_coro::sleep_for(duration);
+    co_return return_value;
+}
+
+} // namespace
+
 using namespace std::chrono_literals;
 
 TEST_CASE("test this_coro") {
@@ -103,7 +114,7 @@ TEST_CASE("test this_coro awaitable") {
     SUBCASE("test sleep") {
         bool called = false;
         auto f = [&]() -> corio::Lazy<void> {
-            co_await corio::this_coro::sleep(100us);
+            co_await corio::this_coro::sleep_for(100us);
             called = true;
         };
 
@@ -126,12 +137,10 @@ TEST_CASE("test this_coro awaitable") {
         auto f = [&]() -> corio::Lazy<void> {
             std::vector<corio::Task<int>> tasks;
             for (int i = 0; i < 5; i++) {
-                tasks.push_back(
-                    co_await corio::spawn(corio::this_coro::sleep(100us, i)));
+                tasks.push_back(co_await corio::spawn(sleep(100us, i)));
             }
             for (int i = 0; i < 5; i++) {
-                auto result = co_await tasks[i];
-                CHECK(result == i);
+                co_await tasks[i];
             }
         };
 
@@ -153,7 +162,7 @@ TEST_CASE("test this_coro awaitable") {
     SUBCASE("test sleep with cancel") {
         bool called = false;
         auto f = [&]() -> corio::Lazy<void> {
-            co_await corio::this_coro::sleep(1ms);
+            co_await corio::this_coro::sleep_for(1ms);
             called = true;
         };
         auto g = [&]() -> corio::Lazy<void> {

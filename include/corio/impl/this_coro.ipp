@@ -1,7 +1,9 @@
 #pragma once
 
+#include "asio/steady_timer.hpp"
 #include "corio/detail/this_coro.hpp"
 #include "corio/lazy.hpp"
+#include "corio/operation.hpp"
 #include "corio/this_coro.hpp"
 #include <asio.hpp>
 #include <optional>
@@ -11,19 +13,21 @@ namespace corio::this_coro {
 inline auto yield() { return detail::YieldAwaiter{}; }
 
 template <typename Rep, typename Period>
-inline auto sleep(std::chrono::duration<Rep, Period> duration) {
-    return detail::SleepAwaiter<Rep, Period>(duration);
+inline corio::Lazy<void>
+sleep_for(const std::chrono::duration<Rep, Period> &duration) {
+    asio::steady_timer timer(co_await corio::this_coro::executor, duration);
+    co_await timer.async_wait(corio::use_corio);
 }
 
-template <typename Rep, typename Period, typename Return>
-inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
-                                 Return return_value) {
-    co_await detail::SleepAwaiter<Rep, Period>(duration);
-    co_return return_value;
+template <typename Clock, typename Duration>
+inline corio::Lazy<void>
+sleep_until(const std::chrono::time_point<Clock, Duration> &time_point) {
+    asio::steady_timer timer(co_await corio::this_coro::executor, time_point);
+    co_await timer.async_wait(corio::use_corio);
 }
 
-inline auto run_on(asio::any_io_executor executor) {
-    return detail::SwitchExecutorAwaiter(executor);
+inline corio::Lazy<void> run_on(const asio::any_io_executor &executor) {
+    co_await asio::post(executor, corio::use_corio);
 }
 
 } // namespace corio::this_coro

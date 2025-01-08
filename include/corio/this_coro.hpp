@@ -19,13 +19,14 @@ inline constexpr detail::StrandPlaceholder strand;
 inline auto yield();
 
 template <typename Rep, typename Period>
-inline auto sleep(std::chrono::duration<Rep, Period> duration);
+inline corio::Lazy<void>
+sleep_for(const std::chrono::duration<Rep, Period> &duration);
 
-template <typename Rep, typename Period, typename Return>
-inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
-                                 Return return_value);
+template <typename Clock, typename Duration>
+inline corio::Lazy<void>
+sleep_until(const std::chrono::time_point<Clock, Duration> &time_point);
 
-inline auto run_on(asio::any_io_executor executor);
+inline corio::Lazy<void> run_on(const asio::any_io_executor &executor);
 
 } // namespace corio::this_coro
 

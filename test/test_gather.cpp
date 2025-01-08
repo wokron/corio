@@ -33,9 +33,9 @@ TEST_CASE("test try gather") {
     }
 
     SUBCASE("gather time") {
-        auto entry = corio::try_gather(corio::this_coro::sleep(100us),
-                                       corio::this_coro::sleep(200us),
-                                       corio::this_coro::sleep(300us));
+        auto entry = corio::try_gather(corio::this_coro::sleep_for(100us),
+                                       corio::this_coro::sleep_for(200us),
+                                       corio::this_coro::sleep_for(300us));
         asio::thread_pool pool(1);
         auto start = std::chrono::steady_clock::now();
         corio::block_on(pool.get_executor(), std::move(entry));
@@ -49,9 +49,9 @@ TEST_CASE("test try gather") {
             co_return 1;
         };
 
-        auto sleep = corio::this_coro::sleep(300us);
+        auto sleep = corio::this_coro::sleep_for(300us);
 
-        auto entry = corio::try_gather(f(), sleep);
+        auto entry = corio::try_gather(f(), std::move(sleep));
         asio::thread_pool pool(1);
 
         auto start = std::chrono::steady_clock::now();
@@ -60,8 +60,10 @@ TEST_CASE("test try gather") {
         auto end = std::chrono::steady_clock::now();
         CHECK((end - start) < 250us);
 
+        auto sleep2 = corio::this_coro::sleep_for(300us);
+
         auto start2 = std::chrono::steady_clock::now();
-        corio::block_on(pool.get_executor(), std::move(sleep));
+        corio::block_on(pool.get_executor(), std::move(sleep2));
         auto end2 = std::chrono::steady_clock::now();
         CHECK((end2 - start2) >= 300us);
     }
@@ -86,7 +88,7 @@ TEST_CASE("test try gather") {
     SUBCASE("gather cancel") {
         auto f = [&](bool &called) -> corio::Lazy<void> {
             corio::detail::DeferGuard guard([&] { called = true; });
-            co_await corio::this_coro::sleep(1s);
+            co_await corio::this_coro::sleep_for(1s);
         };
 
         auto g = [&]() -> corio::Lazy<void> {
@@ -162,7 +164,7 @@ TEST_CASE("test try gather iter") {
     SUBCASE("gather iter with cancel") {
         auto f = [&](bool &called) -> corio::Lazy<void> {
             corio::detail::DeferGuard guard([&] { called = true; });
-            co_await corio::this_coro::sleep(1s);
+            co_await corio::this_coro::sleep_for(1s);
         };
 
         auto g = [&]() -> corio::Lazy<void> {
@@ -252,7 +254,7 @@ TEST_CASE("test gather") {
             co_return 1;
         };
 
-        auto sleep = corio::this_coro::sleep(300us);
+        auto sleep = corio::this_coro::sleep_for(300us);
 
         auto entry = corio::gather(f(), sleep);
         asio::thread_pool pool(1);

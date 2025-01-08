@@ -53,11 +53,11 @@ TEST_CASE("test operation") {
 
             auto task = co_await corio::spawn(g());
 
-            co_await corio::this_coro::sleep(20us);
+            co_await corio::this_coro::sleep_for(20us);
 
             task.abort();
 
-            co_await corio::this_coro::sleep(100us);
+            co_await corio::this_coro::sleep_for(100us);
 
             CHECK(called);
         };
@@ -164,9 +164,9 @@ TEST_CASE("test tcp operations") {
             CHECK(std::equal(buffer.begin(), buffer.begin() + n,
                              recv_buffer.begin()));
 
-            co_await corio::this_coro::sleep(100us);
+            co_await corio::this_coro::sleep_for(100us);
             task.abort();
-            co_await corio::this_coro::sleep(100us);
+            co_await corio::this_coro::sleep_for(100us);
         };
 
         asio::thread_pool pool(3);

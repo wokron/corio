@@ -7,6 +7,17 @@
 
 using namespace std::chrono_literals;
 
+namespace {
+
+template <typename Rep, typename Period, typename Return>
+inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
+                                 Return return_value) {
+    co_await corio::this_coro::sleep_for(duration);
+    co_return return_value;
+}
+
+} // namespace
+
 TEST_CASE("test runner") {
     SUBCASE("test block_no") {
         auto f = []() -> corio::Lazy<int> { co_return 42; };
@@ -23,7 +34,7 @@ TEST_CASE("test runner") {
             std::vector<corio::Task<int>> tasks;
             for (int i = 0; i < 16; i++) {
                 auto task =
-                    co_await corio::spawn(corio::this_coro::sleep(10us, i));
+                    co_await corio::spawn(sleep(10us, i));
                 tasks.push_back(std::move(task));
             }
             for (auto &task : tasks) {
@@ -39,16 +50,12 @@ TEST_CASE("test runner") {
     SUBCASE("test block_no with common awaiter") {
         asio::thread_pool pool(1);
 
-        auto sleep = corio::this_coro::sleep(10us);
-
         auto start = std::chrono::high_resolution_clock::now();
 
-        corio::block_on(pool.get_executor(), sleep);
-        corio::block_on(pool.get_executor(), sleep);
-        corio::block_on(pool.get_executor(), std::move(sleep));
+        corio::block_on(pool.get_executor(), corio::this_coro::sleep_for(10us));
 
         auto end = std::chrono::high_resolution_clock::now();
 
-        CHECK((end - start) >= 30us);
+        CHECK((end - start) >= 10us);
     }
 }
