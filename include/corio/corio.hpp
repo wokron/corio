@@ -5,6 +5,7 @@
 #include "corio/gather.hpp"
 #include "corio/generator.hpp"
 #include "corio/lazy.hpp"
+#include "corio/operation.hpp"
 #include "corio/result.hpp"
 #include "corio/runner.hpp"
 #include "corio/select.hpp"

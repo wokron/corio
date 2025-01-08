@@ -94,6 +94,7 @@ private:
 
     std::optional<Result<T>> result_;
 
+    // TODO: extract this struct as a common class, and use it in other places
     struct Resumer {
         asio::strand<asio::any_io_executor> strand_;
         std::coroutine_handle<> handle_;

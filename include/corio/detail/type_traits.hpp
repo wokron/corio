@@ -4,6 +4,10 @@
 #include <type_traits>
 #include <variant>
 
+namespace corio {
+template <typename T> class Result;
+} // namespace corio
+
 namespace corio::detail {
 
 template <typename T>
@@ -91,5 +95,13 @@ template <typename T> struct unwrap_reference<std::reference_wrapper<T>> {
 
 template <typename Ref>
 using unwrap_reference_t = typename unwrap_reference<Ref>::type;
+
+template <typename T> struct result_value {};
+
+template <typename T> struct result_value<corio::Result<T>> {
+    using type = T;
+};
+
+template <typename T> using result_value_t = typename result_value<T>::type;
 
 } // namespace corio::detail

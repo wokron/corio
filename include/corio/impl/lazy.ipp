@@ -88,6 +88,7 @@ public:
         lazy_.reset(); // Destroy the handle
         if constexpr (std::is_void_v<T>) {
             result.result();
+            return;
         } else {
             return std::move(result.result());
         }
