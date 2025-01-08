@@ -3,6 +3,7 @@
 #include "asio/system_error.hpp"
 #include "asio/thread_pool.hpp"
 #include "corio/run.hpp"
+#include "corio/task.hpp"
 #include <asio.hpp>
 #include <corio/lazy.hpp>
 #include <corio/operation.hpp>
@@ -103,7 +104,7 @@ TEST_CASE("test tcp operations") {
                                            corio::use_corio);
             };
 
-            co_await corio::spawn(g());
+            co_await corio::spawn_background(g());
 
             asio::ip::tcp::socket socket(ex);
             socket.connect(asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port));

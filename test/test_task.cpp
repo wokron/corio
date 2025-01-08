@@ -54,7 +54,7 @@ TEST_CASE("test task") {
         };
 
         auto t1 = corio::spawn(pool.get_executor(), f2());
-        corio::spawn(pool.get_executor(), f3());
+        corio::spawn_background(pool.get_executor(), f3());
 
         pool.join();
 
@@ -92,7 +92,7 @@ TEST_CASE("test task") {
             };
 
             asio::thread_pool pool(1); // Single thread to keep the order
-            corio::spawn(pool.get_executor(), k());
+            corio::spawn_background(pool.get_executor(), k());
 
             pool.join();
 
@@ -105,9 +105,7 @@ TEST_CASE("test task") {
                 auto task = co_await corio::spawn(g());
                 auto cancel_fn =
                     [](corio::Task<int> task) -> corio::Lazy<void> {
-                    task.set_abort_guard(true);
-                    CHECK(task.is_abort_guard());
-                    co_return;
+                    co_return; // task abort here
                 };
                 auto task_cancel =
                     co_await corio::spawn(cancel_fn(std::move(task)));
@@ -116,7 +114,7 @@ TEST_CASE("test task") {
             };
 
             asio::thread_pool pool(1); // Single thread to keep the order
-            corio::spawn(pool.get_executor(), k());
+            corio::spawn_background(pool.get_executor(), k());
 
             pool.join();
 
@@ -143,7 +141,7 @@ TEST_CASE("test task") {
             called = true;
         };
 
-        corio::spawn(pool.get_executor(), g());
+        corio::spawn_background(pool.get_executor(), g());
 
         pool.join();
 
@@ -178,7 +176,7 @@ TEST_CASE("test task") {
             CHECK(task.is_cancelled());
         };
 
-        corio::spawn(pool.get_executor(), g());
+        corio::spawn_background(pool.get_executor(), g());
 
         pool.join();
     }
@@ -214,7 +212,7 @@ TEST_CASE("test task") {
             CHECK(!ok);
         };
 
-        corio::spawn(pool.get_executor(), g());
+        corio::spawn_background(pool.get_executor(), g());
 
         pool.join();
 

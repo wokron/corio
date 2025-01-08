@@ -52,7 +52,6 @@ TEST_CASE("test select") {
 
         auto g = [&]() -> corio::Lazy<void> {
             auto t = co_await corio::spawn(f());
-            t.set_abort_guard(true);
             auto r = co_await corio::select(corio::this_coro::sleep_for(100us),
                                             std::move(t));
             CHECK(r.index() == 0);
@@ -165,7 +164,7 @@ TEST_CASE("test select iter") {
         corio::block_on(pool.get_executor(), g());
     }
 
-    SUBCASE("select multiple cancecl") {
+    SUBCASE("select multiple cancel") {
         auto f = [](bool &called) -> corio::Lazy<void> {
             corio::detail::DeferGuard guard([&]() { called = true; });
             co_await corio::this_coro::sleep_for(1s);
@@ -178,7 +177,6 @@ TEST_CASE("test select iter") {
             std::array<bool, 10> flags;
             for (int i = 0; i < 10; i++) {
                 auto task = co_await corio::spawn(f(flags[i]));
-                task.set_abort_guard(true);
                 vec.push_back(std::move(task));
             }
 

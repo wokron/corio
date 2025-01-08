@@ -15,10 +15,15 @@ namespace corio {
 
 template <typename T> class Task;
 
-template <typename T> Lazy<Task<T>> spawn(Lazy<T> lazy);
+template <typename T> [[nodiscard]] Lazy<Task<T>> spawn(Lazy<T> lazy);
 
 template <typename T>
-Task<T> spawn(asio::any_io_executor executor, Lazy<T> lazy);
+[[nodiscard]] Task<T> spawn(asio::any_io_executor executor, Lazy<T> lazy);
+
+template <typename T> Lazy<void> spawn_background(Lazy<T> lazy);
+
+template <typename T>
+void spawn_background(asio::any_io_executor executor, Lazy<T> lazy);
 
 template <typename T> class TaskAwaiter;
 
@@ -60,15 +65,11 @@ public:
 
     TaskAwaiter<T> operator co_await() const;
 
-    void set_abort_guard(bool value) { abort_guard_ = value; }
-    bool is_abort_guard() const { return abort_guard_; }
-
 private:
     static Lazy<void> launch_task_(Lazy<T> lazy,
                                    std::shared_ptr<SharedState> shared_state);
 
     std::shared_ptr<SharedState> state_ = nullptr;
-    bool abort_guard_ = false;
 };
 
 template <typename T> class AbortHandle {

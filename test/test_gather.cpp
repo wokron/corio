@@ -96,7 +96,6 @@ TEST_CASE("test try gather") {
             bool called2 = false;
             auto t1 = co_await corio::spawn(f(called1));
             auto t2 = co_await corio::spawn(f(called2));
-            t2.set_abort_guard(true);
             auto exception_lazy = []() -> corio::Lazy<void> {
                 throw std::runtime_error("error");
                 co_return;
@@ -114,7 +113,7 @@ TEST_CASE("test try gather") {
             CHECK_THROWS(
                 co_await corio::try_gather(std::move(t1), exception_lazy()));
             co_await corio::this_coro::yield();
-            CHECK(!called1); // t1 is detached, but not canceled
+            CHECK(called1);
         };
 
         asio::thread_pool pool(1);
@@ -172,7 +171,6 @@ TEST_CASE("test try gather iter") {
             bool called2 = false;
             auto t1 = co_await corio::spawn(f(called1));
             auto t2 = co_await corio::spawn(f(called2));
-            t2.set_abort_guard(true);
             auto exception_lazy = []() -> corio::Lazy<void> {
                 throw std::runtime_error("error");
                 co_return;
@@ -191,7 +189,7 @@ TEST_CASE("test try gather iter") {
 
             CHECK_THROWS(co_await corio::try_gather(std::move(vec)));
             co_await corio::this_coro::yield();
-            CHECK(!called1);
+            CHECK(called1);
             CHECK(called2);
         };
 

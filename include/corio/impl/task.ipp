@@ -21,12 +21,11 @@ template <typename T> Task<T> &Task<T>::operator=(Task &&other) noexcept {
         return *this;
     }
     state_ = std::move(other.state_);
-    abort_guard_ = std::exchange(other.abort_guard_, false);
     return *this;
 }
 
 template <typename T> Task<T>::~Task() {
-    if (state_ != nullptr && abort_guard_) {
+    if (state_ != nullptr) {
         abort();
     }
 }
@@ -64,10 +63,8 @@ template <typename T> bool Task<T>::detach() {
     if (state_ == nullptr) {
         return false;
     }
-    if (abort_guard_) {
-        abort();
-    }
     state_ = nullptr;
+    return true;
 }
 
 template <typename T> class TaskAwaiter {
@@ -181,6 +178,17 @@ template <typename T> Lazy<Task<T>> spawn(Lazy<T> lazy) {
 template <typename T> bool AbortHandle<T>::abort() {
     CORIO_ASSERT(state_ != nullptr, "The task is not initialized");
     return state_->request_abort();
+}
+
+template <typename T> Lazy<void> spawn_background(Lazy<T> lazy) {
+    asio::any_io_executor executor = co_await this_coro::executor;
+    spawn_background(executor, std::move(lazy));
+}
+
+template <typename T>
+void spawn_background(asio::any_io_executor executor, Lazy<T> lazy) {
+    Task<T> task = spawn(executor, std::move(lazy));
+    task.detach();
 }
 
 } // namespace corio

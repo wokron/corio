@@ -75,7 +75,7 @@ TEST_CASE("test this_coro awaitable") {
 
         asio::thread_pool pool(1);
 
-        corio::spawn(pool.executor(), f());
+        corio::spawn_background(pool.executor(), f());
 
         pool.join();
 
@@ -103,7 +103,7 @@ TEST_CASE("test this_coro awaitable") {
 
         asio::thread_pool pool(1);
 
-        corio::spawn(pool.executor(), g());
+        corio::spawn_background(pool.executor(), g());
 
         pool.join();
 
@@ -120,7 +120,7 @@ TEST_CASE("test this_coro awaitable") {
 
         asio::thread_pool pool(1);
 
-        corio::spawn(pool.executor(), f());
+        corio::spawn_background(pool.executor(), f());
 
         auto start = std::chrono::steady_clock::now();
 
@@ -148,7 +148,7 @@ TEST_CASE("test this_coro awaitable") {
 
         auto start = std::chrono::steady_clock::now();
 
-        corio::spawn(pool.executor(), f());
+        corio::spawn_background(pool.executor(), f());
 
         pool.join();
 
@@ -177,7 +177,7 @@ TEST_CASE("test this_coro awaitable") {
 
         auto start = std::chrono::steady_clock::now();
 
-        corio::spawn(pool.executor(), g());
+        corio::spawn_background(pool.executor(), g());
 
         pool.join();
 
