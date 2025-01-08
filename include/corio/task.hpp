@@ -29,7 +29,7 @@ template <typename T> class TaskAwaiter;
 
 template <typename T> class AbortHandle;
 
-template <typename T> class Task {
+template <typename T> class [[nodiscard]] Task {
 public:
     using SharedState = detail::TaskSharedState<T>;
 

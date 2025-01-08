@@ -15,7 +15,7 @@ template <typename T> class LazyPromise;
 
 template <typename T> class LazyAwaiter;
 
-template <typename T> class Lazy {
+template <typename T> class [[nodiscard]] Lazy {
 public:
     using promise_type = detail::LazyPromise<T>;
 
