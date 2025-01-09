@@ -79,8 +79,10 @@ public:
     using ResultType = decltype(build_result(std::declval<Args>()...));
 
     explicit CompletionHandler(std::coroutine_handle<> handle,
-                               asio::cancellation_slot slot, ResultType &result)
-        : handle_(handle), slot_(std::move(slot)), result_(result) {}
+                               asio::cancellation_slot slot, ResultType &result,
+                               std::shared_ptr<bool> canceled)
+        : handle_(handle), slot_(std::move(slot)), result_(result),
+          canceled_(canceled) {}
 
 public:
     using cancellation_slot_type = asio::cancellation_slot;
@@ -92,6 +94,9 @@ public:
         if (is_operation_aborted(args...)) {
             return;
         }
+        if (*canceled_) {
+            return;
+        }
         result_ = build_result(std::forward<Args>(args)...);
         handle_.resume();
     }
@@ -100,6 +105,7 @@ private:
     std::coroutine_handle<> handle_;
     asio::cancellation_slot slot_;
     ResultType &result_;
+    std::shared_ptr<bool> canceled_;
 };
 
 } // namespace corio::detail

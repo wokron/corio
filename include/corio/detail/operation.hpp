@@ -27,9 +27,8 @@ public:
     Operation &operator=(Operation &&) = default;
 
     ~Operation() {
-        if (signal_) {
-            signal_->emit(asio::cancellation_type::all);
-        }
+        signal_->emit(asio::cancellation_type::all);
+        *cancelled_ = true;
     }
 
 public:
@@ -37,8 +36,8 @@ public:
 
     template <typename Promise>
     void await_suspend(std::coroutine_handle<Promise> handle) {
-        auto completion_handler =
-            CompletionHandler<Args...>(handle, signal_->slot(), result_);
+        auto completion_handler = CompletionHandler<Args...>(
+            handle, signal_->slot(), result_, cancelled_);
         initiate_(std::move(completion_handler));
     }
 
@@ -66,6 +65,8 @@ private:
     PackedInitArgs init_args_;
 
     std::unique_ptr<asio::cancellation_signal> signal_;
+    // Used for non-cancelable operations
+    std::shared_ptr<bool> cancelled_ = std::make_shared<bool>(false);
 
     ResultType result_;
 };

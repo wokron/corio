@@ -16,7 +16,7 @@ inline constexpr detail::ExecutorPlaceholder executor;
 
 inline constexpr detail::StrandPlaceholder strand;
 
-inline auto yield();
+inline corio::Lazy<void> yield();
 
 template <typename Rep, typename Period>
 inline corio::Lazy<void>

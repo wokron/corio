@@ -10,7 +10,9 @@
 
 namespace corio::this_coro {
 
-inline auto yield() { return detail::YieldAwaiter{}; }
+inline corio::Lazy<void> yield() {
+    co_await asio::post(co_await corio::this_coro::executor, corio::use_corio);
+}
 
 template <typename Rep, typename Period>
 inline corio::Lazy<void>
