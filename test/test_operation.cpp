@@ -24,7 +24,7 @@ TEST_CASE("test operation") {
 
     SUBCASE("timer operation basic") {
         auto f = []() -> corio::Lazy<void> {
-            auto ex = co_await corio::this_coro::executor;
+            auto ex = co_await corio::this_coro::strand;
             asio::steady_timer timer(ex, 100us);
 
             auto start = std::chrono::steady_clock::now();
@@ -41,7 +41,7 @@ TEST_CASE("test operation") {
 
     SUBCASE("timer operation with cancel") {
         auto f = []() -> corio::Lazy<void> {
-            auto ex = co_await corio::this_coro::executor;
+            auto ex = co_await corio::this_coro::strand;
             asio::steady_timer timer(ex, 100us);
 
             bool called = false;
@@ -87,7 +87,7 @@ TEST_CASE("test tcp operations") {
 
     SUBCASE("tcp echo server") {
         auto f = []() -> corio::Lazy<void> {
-            auto ex = co_await corio::this_coro::executor;
+            auto ex = co_await corio::this_coro::strand;
 
             asio::ip::tcp::acceptor acceptor(
                 ex, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
@@ -129,7 +129,7 @@ TEST_CASE("test tcp operations") {
 
     SUBCASE("tcp echo server with cancel") {
         auto f = []() -> corio::Lazy<void> {
-            auto ex = co_await corio::this_coro::executor;
+            auto ex = co_await corio::this_coro::strand;
 
             asio::ip::tcp::acceptor acceptor(
                 ex, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), 0));
