@@ -27,10 +27,6 @@ TEST_CASE("test type traits") {
             std::is_same_v<awaitable_return_t<corio::Lazy<int>>, int>);
         static_assert(
             std::is_same_v<awaitable_return_t<corio::Lazy<void>>, void>);
-        static_assert(
-            std::is_same_v<
-                awaitable_return_t<corio::this_coro::detail::YieldAwaiter>,
-                void>);
     }
 
     SUBCASE("test at_position_t") {

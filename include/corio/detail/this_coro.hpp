@@ -46,72 +46,41 @@ struct StrandAwaiter {
     asio::strand<asio::any_io_executor> strand;
 };
 
-struct YieldAwaiter {
-    YieldAwaiter() = default;
-    YieldAwaiter(const YieldAwaiter &) = delete;
-    YieldAwaiter &operator=(const YieldAwaiter &) = delete;
-    YieldAwaiter(YieldAwaiter &&) = default;
-    YieldAwaiter &operator=(YieldAwaiter &&) = default;
+struct SwitchExecutorAwaiter {
+    explicit SwitchExecutorAwaiter(const asio::any_io_executor &executor)
+        : executor(executor) {}
+
+    SwitchExecutorAwaiter(const SwitchExecutorAwaiter &) = delete;
+    SwitchExecutorAwaiter &operator=(const SwitchExecutorAwaiter &) = delete;
+    SwitchExecutorAwaiter(SwitchExecutorAwaiter &&) = default;
+    SwitchExecutorAwaiter &operator=(SwitchExecutorAwaiter &&) = default;
 
     bool await_ready() const noexcept { return false; }
 
     template <typename PromiseType>
-    void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
-        PromiseType &promise = handle.promise();
-        CORIO_ASSERT(promise.executor(), "The executor is not set");
-        auto &strand = promise.strand();
-        asio::post(strand, [h = handle, c = cancelled] {
-            bool is_cancelled = *c;
-            if (!is_cancelled) {
-                h.resume();
-            }
-        });
+    bool await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
+        auto &promise = handle.promise();
+        auto old_strand = promise.strand();
+        if (old_strand.get_inner_executor() == executor) {
+            return false;
+        }
+        promise.set_executor(executor);
+        asio::post(handle.promise().strand(), [handle] { handle.resume(); });
+        return true;
     }
 
-    void await_resume() noexcept {}
+    void await_resume() noexcept { finish_switch = true; }
 
-    ~YieldAwaiter() {
-        if (cancelled != nullptr) {
-            *cancelled = true;
+    ~SwitchExecutorAwaiter() {
+        if (!finish_switch) {
+            // The coroutine is canceled before the executor is switched,
+            // which is undefined behavior
+            std::terminate();
         }
     }
 
-    std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
-};
-
-template <typename Rep, typename Period> struct SleepAwaiter {
-    explicit SleepAwaiter(std::chrono::duration<Rep, Period> duration)
-        : duration(duration) {}
-    SleepAwaiter(const SleepAwaiter &) = delete;
-    SleepAwaiter &operator=(const SleepAwaiter &) = delete;
-    SleepAwaiter(SleepAwaiter &&) = default;
-    SleepAwaiter &operator=(SleepAwaiter &&) = default;
-
-    bool await_ready() const noexcept { return false; }
-
-    template <typename PromiseType>
-    void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
-        PromiseType &promise = handle.promise();
-        CORIO_ASSERT(promise.executor(), "The executor is not set");
-        auto &strand = promise.strand();
-        timer = asio::steady_timer{strand, duration};
-        timer.value().async_wait([h = handle](const asio::error_code &error) {
-            if (!error) {
-                h.resume();
-            }
-        });
-    }
-
-    void await_resume() noexcept {}
-
-    ~SleepAwaiter() {
-        if (timer.has_value()) {
-            timer.value().cancel();
-        }
-    }
-
-    std::chrono::duration<Rep, Period> duration;
-    std::optional<asio::steady_timer> timer;
+    asio::any_io_executor executor;
+    bool finish_switch = false;
 };
 
 } // namespace detail

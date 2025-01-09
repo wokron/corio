@@ -26,7 +26,7 @@ template <typename Clock, typename Duration>
 inline corio::Lazy<void>
 sleep_until(const std::chrono::time_point<Clock, Duration> &time_point);
 
-inline corio::Lazy<void> run_on(const asio::any_io_executor &executor);
+inline auto run_on(const asio::any_io_executor &executor);
 
 } // namespace corio::this_coro
 

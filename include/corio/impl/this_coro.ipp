@@ -28,8 +28,8 @@ sleep_until(const std::chrono::time_point<Clock, Duration> &time_point) {
     co_await timer.async_wait(corio::use_corio);
 }
 
-inline corio::Lazy<void> run_on(const asio::any_io_executor &executor) {
-    co_await asio::post(executor, corio::use_corio);
+inline auto run_on(const asio::any_io_executor &executor) {
+    return corio::this_coro::detail::SwitchExecutorAwaiter(executor);
 }
 
 } // namespace corio::this_coro
