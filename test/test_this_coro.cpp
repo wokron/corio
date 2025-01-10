@@ -111,10 +111,33 @@ TEST_CASE("test this_coro awaitable") {
         CHECK_FALSE(called);
     }
 
-    SUBCASE("test sleep") {
+    SUBCASE("test sleep for") {
         bool called = false;
         auto f = [&]() -> corio::Lazy<void> {
             co_await corio::this_coro::sleep_for(100us);
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::spawn_background(pool.executor(), f());
+
+        auto start = std::chrono::steady_clock::now();
+
+        pool.join();
+
+        auto end = std::chrono::steady_clock::now();
+        auto duration = end - start;
+
+        CHECK(called);
+        CHECK(duration >= 100us);
+    }
+
+    SUBCASE("test sleep until") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            auto now_time = std::chrono::steady_clock::now();
+            co_await corio::this_coro::sleep_until(now_time + 100us);
             called = true;
         };
 

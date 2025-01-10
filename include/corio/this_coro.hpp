@@ -16,14 +16,13 @@ inline constexpr detail::ExecutorPlaceholder executor;
 
 inline constexpr detail::StrandPlaceholder strand;
 
-inline corio::Lazy<void> yield();
+inline auto yield();
 
 template <typename Rep, typename Period>
-inline corio::Lazy<void>
-sleep_for(const std::chrono::duration<Rep, Period> &duration);
+inline auto sleep_for(const std::chrono::duration<Rep, Period> &duration);
 
 template <typename Clock, typename Duration>
-inline corio::Lazy<void>
+inline auto
 sleep_until(const std::chrono::time_point<Clock, Duration> &time_point);
 
 inline auto run_on(const asio::any_io_executor &executor);

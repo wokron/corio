@@ -10,26 +10,21 @@
 
 namespace corio::this_coro {
 
-inline corio::Lazy<void> yield() {
-    co_await asio::post(co_await corio::this_coro::strand, corio::use_corio);
-}
+inline auto yield() { return detail::YieldAwaiter(); }
 
 template <typename Rep, typename Period>
-inline corio::Lazy<void>
-sleep_for(const std::chrono::duration<Rep, Period> &duration) {
-    asio::steady_timer timer(co_await corio::this_coro::strand, duration);
-    co_await timer.async_wait(corio::use_corio);
+inline auto sleep_for(const std::chrono::duration<Rep, Period> &duration) {
+    return detail::SleepAwaiter(duration);
 }
 
 template <typename Clock, typename Duration>
-inline corio::Lazy<void>
+inline auto
 sleep_until(const std::chrono::time_point<Clock, Duration> &time_point) {
-    asio::steady_timer timer(co_await corio::this_coro::strand, time_point);
-    co_await timer.async_wait(corio::use_corio);
+    return detail::SleepAwaiter(time_point);
 }
 
 inline auto run_on(const asio::any_io_executor &executor) {
-    return corio::this_coro::detail::SwitchExecutorAwaiter(executor);
+    return detail::SwitchExecutorAwaiter(executor);
 }
 
 } // namespace corio::this_coro
