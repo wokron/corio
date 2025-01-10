@@ -15,3 +15,5 @@ target_include_directories(corio INTERFACE include)
 target_link_libraries(corio INTERFACE asio)
 
 add_subdirectory(test)
+
+add_subdirectory(bench)
