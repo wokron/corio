@@ -9,7 +9,7 @@ public:
     using Awaitable = std::iter_value_t<Iterable>;
     using AwaitableReturn = awaitable_return_t<Awaitable>;
     using ReturnType =
-        std::vector<corio::Result<void_to_monostate_t<AwaitableReturn>>>;
+        std::vector<corio::Result<AwaitableReturn>>;
 
     void init(Iterable &iterable) {
         std::size_t total = std::size(iterable);

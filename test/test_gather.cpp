@@ -85,6 +85,24 @@ TEST_CASE("test try gather") {
         CHECK(*b == 2.34);
     }
 
+    SUBCASE("gather void type") {
+        auto f = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+
+        bool called = false;
+        auto entry =
+            corio::try_gather(f(called), corio::this_coro::sleep_for(100us));
+        asio::thread_pool pool(1);
+
+        auto [x, y] = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(x == std::monostate{});
+        CHECK(y == std::monostate{});
+
+        CHECK(called);
+    }
+
     SUBCASE("gather cancel") {
         auto f = [&](bool &called) -> corio::Lazy<void> {
             corio::detail::DeferGuard guard([&] { called = true; });
@@ -158,6 +176,49 @@ TEST_CASE("test try gather iter") {
         asio::thread_pool pool(1);
         CHECK_THROWS_AS(corio::block_on(pool.get_executor(), std::move(entry)),
                         std::runtime_error);
+    }
+
+    SUBCASE("gather iter with move-only type") {
+        auto f = [](int v) -> corio::Lazy<std::unique_ptr<int>> {
+            co_return std::make_unique<int>(v);
+        };
+
+        std::vector<corio::Lazy<std::unique_ptr<int>>> vec;
+        vec.push_back(f(1));
+        vec.push_back(f(2));
+        vec.push_back(f(3));
+
+        auto entry = corio::try_gather(vec);
+
+        asio::thread_pool pool(1);
+        auto result = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(result.size() == 3);
+        CHECK(*result[0] == 1);
+        CHECK(*result[1] == 2);
+        CHECK(*result[2] == 3);
+    }
+
+    SUBCASE("gather iter with void type") {
+        auto f = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+
+        bool called = false;
+        bool called2 = false;
+        std::vector<corio::Lazy<void>> vec;
+        vec.push_back(f(called));
+        vec.push_back(f(called2));
+
+        auto entry = corio::try_gather(vec);
+        asio::thread_pool pool(1);
+
+        auto result = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK(result.size() == 2);
+        CHECK(result[0] == std::monostate{});
+        CHECK(result[1] == std::monostate{});
+        CHECK(called);
+        CHECK(called2);
     }
 
     SUBCASE("gather iter with cancel") {
@@ -281,6 +342,24 @@ TEST_CASE("test gather") {
         auto [a, b] = corio::block_on(pool.get_executor(), std::move(entry));
         CHECK(*a.result() == 1);
         CHECK(*b.result() == 2.34);
+    }
+
+    SUBCASE("gather void type") {
+        auto f = [](bool &called) -> corio::Lazy<void> {
+            called = true;
+            co_return;
+        };
+
+        bool called = false;
+        auto entry =
+            corio::gather(f(called), corio::this_coro::sleep_for(100us));
+        asio::thread_pool pool(1);
+
+        auto [x, y] = corio::block_on(pool.get_executor(), std::move(entry));
+        CHECK_NOTHROW(x.result());
+        CHECK_NOTHROW(y.result());
+
+        CHECK(called);
     }
 }
 
