@@ -6,11 +6,28 @@
 #include <corio/task.hpp>
 #include <doctest/doctest.h>
 #include <thread>
+#include <utility>
 
 namespace {
 
 struct CancelableSimpleAwaiter {
     bool await_ready() noexcept { return false; }
+
+    CancelableSimpleAwaiter() = default;
+
+    CancelableSimpleAwaiter(const CancelableSimpleAwaiter &) = delete;
+    CancelableSimpleAwaiter &
+    operator=(const CancelableSimpleAwaiter &) = delete;
+
+    CancelableSimpleAwaiter(CancelableSimpleAwaiter &&other)
+        : cancelled(std::exchange(other.cancelled, nullptr)) {}
+
+    CancelableSimpleAwaiter &operator=(CancelableSimpleAwaiter &&other) {
+        if (this != &other) {
+            cancelled = std::exchange(other.cancelled, nullptr);
+        }
+        return *this;
+    }
 
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
@@ -26,7 +43,11 @@ struct CancelableSimpleAwaiter {
 
     void await_resume() noexcept {}
 
-    ~CancelableSimpleAwaiter() { *cancelled = true; }
+    ~CancelableSimpleAwaiter() {
+        if (cancelled != nullptr) {
+            *cancelled = true;
+        }
+    }
 
     std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
 };
@@ -62,6 +83,34 @@ TEST_CASE("test task") {
         CHECK(called2);
         CHECK(t1.is_finished());
         CHECK(t1.get_result().result() == 42);
+    }
+
+    SUBCASE("spawn any awaitable") {
+        asio::thread_pool pool(1);
+
+        bool called = false;
+
+        auto f = []() -> corio::Lazy<int> { co_return 42; };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            auto t = corio::spawn(pool.get_executor(), f());
+
+            auto t2 = corio::spawn(pool.get_executor(), std::move(t));
+
+            auto t3 =
+                corio::spawn(pool.get_executor(), CancelableSimpleAwaiter{});
+
+            CHECK(co_await t2 == 42);
+            co_await t3;
+
+            called = true;
+        };
+
+        corio::spawn_background(pool.get_executor(), g());
+
+        pool.join();
+
+        CHECK(called);
     }
 
     SUBCASE("abort task basic") {

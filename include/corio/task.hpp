@@ -2,6 +2,7 @@
 
 #include "corio/detail/assert.hpp"
 #include "corio/detail/task_shared_state.hpp"
+#include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
 #include "corio/result.hpp"
 #include <asio.hpp>
@@ -15,15 +16,19 @@ namespace corio {
 
 template <typename T> class Task;
 
-template <typename T> [[nodiscard]] Lazy<Task<T>> spawn(Lazy<T> lazy);
+template <detail::awaitable Awaitable>
+[[nodiscard]] Lazy<Task<detail::awaitable_return_t<Awaitable>>>
+spawn(Awaitable awaitable);
 
-template <typename T>
-[[nodiscard]] Task<T> spawn(asio::any_io_executor executor, Lazy<T> lazy);
+template <detail::awaitable Awaitable>
+[[nodiscard]] Task<detail::awaitable_return_t<Awaitable>>
+spawn(asio::any_io_executor executor, Awaitable awaitable);
 
-template <typename T> Lazy<void> spawn_background(Lazy<T> lazy);
+template <detail::awaitable Awaitable>
+Lazy<void> spawn_background(Awaitable awaitable);
 
-template <typename T>
-void spawn_background(asio::any_io_executor executor, Lazy<T> lazy);
+template <detail::awaitable Awaitable>
+void spawn_background(asio::any_io_executor executor, Awaitable awaitable);
 
 template <typename T> class TaskAwaiter;
 
@@ -33,7 +38,8 @@ template <typename T> class [[nodiscard]] Task {
 public:
     using SharedState = detail::TaskSharedState<T>;
 
-    explicit Task(Lazy<T> lazy, asio::any_io_executor executor);
+    template <detail::awaitable Awaitable>
+    explicit Task(Awaitable lazy, asio::any_io_executor executor);
 
 public:
     Task() = default;
@@ -66,7 +72,8 @@ public:
     TaskAwaiter<T> operator co_await() const;
 
 private:
-    static Lazy<void> launch_task_(Lazy<T> lazy,
+    template <detail::awaitable Awaitable>
+    static Lazy<void> launch_task_(Awaitable awaitable,
                                    std::shared_ptr<SharedState> shared_state);
 
     std::shared_ptr<SharedState> state_ = nullptr;

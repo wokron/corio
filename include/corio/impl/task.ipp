@@ -4,13 +4,15 @@
 #include "corio/task.hpp"
 #include "corio/this_coro.hpp"
 #include <memory>
+#include <type_traits>
 
 namespace corio {
 
 template <typename T>
-Task<T>::Task(Lazy<T> lazy, asio::any_io_executor executor) {
+template <detail::awaitable Awaitable>
+Task<T>::Task(Awaitable awaitable, asio::any_io_executor executor) {
     state_ = std::make_shared<SharedState>();
-    Lazy<void> entry = launch_task_(std::move(lazy), state_);
+    Lazy<void> entry = launch_task_(std::move(awaitable), state_);
     entry.set_executor(executor);
     state_->set_entry(std::move(entry));
     state_->entry().execute(); // After setting entry to prevent a lock
@@ -143,17 +145,25 @@ template <typename T> struct TaskLazyAwaiter {
 } // namespace detail
 
 template <typename T>
-Lazy<void> Task<T>::launch_task_(Lazy<T> lazy,
+template <detail::awaitable Awaitable>
+Lazy<void> Task<T>::launch_task_(Awaitable awaitable,
                                  std::shared_ptr<SharedState> state) {
-    detail::TaskLazyAwaiter<T> awaiter{lazy};
-
-    co_await awaiter;
-    CORIO_ASSERT(lazy.is_finished(), "The lazy is not finished");
+    Result<T> result;
+    try {
+        if constexpr (std::is_void_v<T>) {
+            co_await awaitable;
+            result = Result<T>::from_result();
+        } else {
+            auto r = co_await awaitable;
+            result = Result<T>::from_result(std::move(r));
+        }
+    } catch (...) {
+        result = Result<T>::from_exception(std::current_exception());
+    }
 
     {
         auto lock = state->lock();
 
-        auto result = std::move(lazy.get_result());
         state->set_result(std::move(result));
         state->resume();
 
@@ -163,16 +173,19 @@ Lazy<void> Task<T>::launch_task_(Lazy<T> lazy,
     }
 }
 
-template <typename T>
-Task<T> spawn(asio::any_io_executor executor, Lazy<T> lazy) {
-    return Task<T>(std::move(lazy), executor);
+template <detail::awaitable Awaitable>
+Task<detail::awaitable_return_t<Awaitable>>
+spawn(asio::any_io_executor executor, Awaitable awaitable) {
+    using T = detail::awaitable_return_t<Awaitable>;
+    return Task<T>(std::move(awaitable), executor);
 }
 
-template <typename T> Lazy<Task<T>> spawn(Lazy<T> lazy) {
+template <detail::awaitable Awaitable>
+Lazy<Task<detail::awaitable_return_t<Awaitable>>> spawn(Awaitable awaitable) {
     // The new task will run concurrently with the current task, so we should
     // use executor instead of strand here
     asio::any_io_executor executor = co_await this_coro::executor;
-    co_return spawn(executor, std::move(lazy));
+    co_return spawn(executor, std::move(awaitable));
 }
 
 template <typename T> bool AbortHandle<T>::abort() {
@@ -180,14 +193,15 @@ template <typename T> bool AbortHandle<T>::abort() {
     return state_->request_abort();
 }
 
-template <typename T> Lazy<void> spawn_background(Lazy<T> lazy) {
+template <detail::awaitable Awaitable>
+Lazy<void> spawn_background(Awaitable awaitable) {
     asio::any_io_executor executor = co_await this_coro::executor;
-    spawn_background(executor, std::move(lazy));
+    spawn_background(executor, std::move(awaitable));
 }
 
-template <typename T>
-void spawn_background(asio::any_io_executor executor, Lazy<T> lazy) {
-    Task<T> task = spawn(executor, std::move(lazy));
+template <detail::awaitable Awaitable>
+void spawn_background(asio::any_io_executor executor, Awaitable awaitable) {
+    auto task = spawn(executor, std::move(awaitable));
     task.detach();
 }
 
