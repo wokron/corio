@@ -25,11 +25,6 @@ public:
         return std::forward<Awaitable>(awaitable);
     }
 
-    template <detail::awaitable Awaitable>
-    auto &await_transform(std::reference_wrapper<Awaitable> awaitable_ref) {
-        return awaitable_ref.get();
-    }
-
 public:
     void set_executor(asio::any_io_executor executor) {
         executor_ = executor;

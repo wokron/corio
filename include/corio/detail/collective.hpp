@@ -1,10 +1,10 @@
 #pragma once
 
-#include <asio.hpp>
 #include "corio/detail/concepts.hpp"
 #include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
 #include "corio/result.hpp"
+#include <asio.hpp>
 
 namespace corio::detail {
 
@@ -114,10 +114,17 @@ public:
 private:
     template <std::size_t I = 0> void launch_all_await_impl_(Tuple &tuple) {
         if constexpr (I < std::tuple_size_v<Tuple>) {
+            using Awaitable = std::tuple_element_t<I, Tuple>;
+
             auto &awaitable = std::get<I>(tuple);
 
-            corio::Lazy<void> lazy =
-                handler_.template do_co_await<I>(*this, awaitable);
+            corio::Lazy<void> lazy;
+            if constexpr (is_reference_wrapper_v<Awaitable>) {
+                lazy = handler_.template do_co_await<I>(*this, awaitable.get());
+            } else {
+                lazy = handler_.template do_co_await<I>(*this, awaitable);
+            }
+
             lazy.set_strand(get_strand_());
             lazy.execute();
             lazies_.push_back(std::move(lazy)); // Keep lazy alive
