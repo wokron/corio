@@ -12,18 +12,6 @@ template <typename T> class Lazy;
 
 namespace corio::detail {
 
-struct FinalAwaiter {
-    bool await_ready() noexcept { return ready; }
-
-    template <typename PromiseType>
-    std::coroutine_handle<>
-    await_suspend(std::coroutine_handle<PromiseType> handle) noexcept;
-
-    void await_resume() noexcept {}
-
-    bool ready = false;
-};
-
 class LazyPromiseBase : public PromiseBase {
 public:
     std::suspend_always initial_suspend() { return {}; }
