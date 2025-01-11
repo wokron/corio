@@ -10,10 +10,12 @@ template <detail::awaitable Awaitable>
 Task<T>::Task(Awaitable aw, const detail::SerialRunner &runner) {
     state_ = std::make_shared<SharedState>(runner);
     Lazy<void> entry = launch_task_(std::move(aw), state_);
-    entry.set_context(state_->context());
+
     auto entry_handle = entry.get();
     state_->set_entry_handle(entry_handle);
     entry_handle.promise().set_destroy_when_exit(true);
+
+    entry.set_context(state_->context());
     entry.execute(); // After setting entry to prevent a lock
     entry.release();
 }
@@ -120,7 +122,6 @@ public:
 
     ~TaskAwaiter() {
         if (canceled_ != nullptr) {
-            auto lock = state_->lock();
             *canceled_ = true;
         }
     }

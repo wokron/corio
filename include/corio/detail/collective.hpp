@@ -32,7 +32,7 @@ public:
         collector_.launch_all_await(awaitables_, handle);
     }
 
-    auto await_resume() { return collector_.unwrap_results(); }
+    auto await_resume() { return collector_.collect_results(); }
 
 private:
     AwaitablesType awaitables_;
@@ -96,7 +96,7 @@ public:
         }
     }
 
-    auto unwrap_results() { return handler_.unwrap_results(); }
+    auto collect_results() { return handler_.collect_results(); }
 
 private:
     CollectHandler handler_;
@@ -115,7 +115,7 @@ public:
         launch_all_await_impl_(tuple);
     }
 
-    auto unwrap_results() { return handler_.unwrap_results(); }
+    auto collect_results() { return handler_.collect_results(); }
 
 private:
     template <std::size_t I = 0> void launch_all_await_impl_(Tuple &tuple) {

@@ -39,7 +39,7 @@ public:
         }
     }
 
-    ReturnType unwrap_results() {
+    ReturnType collect_results() {
         if (first_exception_ != nullptr) {
             std::rethrow_exception(first_exception_);
         }
@@ -52,14 +52,13 @@ private:
     std::exception_ptr first_exception_;
 };
 
-template <typename T> struct unwrap_and_return_and_monostate {
-    using type = void_to_monostate_t<awaitable_return_t<unwrap_reference_t<T>>>;
+template <typename T> struct tuple_try_gather_result {
+    using type = void_to_monostate_t<awaitable_return_t<T>>;
 };
 
 template <typename Tuple> class TupleTryGatherCollectHandler {
 public:
-    using ReturnType =
-        transform_tuple_t<Tuple, unwrap_and_return_and_monostate>;
+    using ReturnType = transform_tuple_t<Tuple, tuple_try_gather_result>;
 
     void init(Tuple &tuple) {
         std::size_t total = std::tuple_size_v<Tuple>;
@@ -69,10 +68,10 @@ public:
     template <std::size_t I, typename Awaitable>
     corio::Lazy<void> do_co_await(CollectorBase &collector,
                                   Awaitable &awaitable) {
+        using T = awaitable_return_t<Awaitable>;
         auto &result = std::get<I>(results_);
         try {
-            if constexpr (std::is_same_v<std::tuple_element_t<I, ReturnType>,
-                                         std::monostate>) {
+            if constexpr (std::is_void_v<T>) {
                 co_await awaitable;
             } else {
                 result = co_await awaitable;
@@ -90,7 +89,7 @@ public:
         }
     }
 
-    ReturnType unwrap_results() {
+    ReturnType collect_results() {
         if (first_exception_ != nullptr) {
             std::rethrow_exception(first_exception_);
         }

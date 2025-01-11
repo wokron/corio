@@ -2,9 +2,7 @@
 
 #include "corio/detail/collective.hpp"
 #include "corio/detail/concepts.hpp"
-#include "corio/detail/try_gather.hpp"
 #include "corio/detail/type_traits.hpp"
-#include <cstddef>
 #include <utility>
 #include <variant>
 
@@ -52,18 +50,22 @@ public:
         }
     }
 
-    ReturnType unwrap_results() { return {no_, std::move(result_.result())}; }
+    ReturnType collect_results() { return {no_, std::move(result_.result())}; }
 
 private:
     std::size_t no_ = -1;
     corio::Result<void_to_monostate_t<AwaitableReturn>> result_;
 };
 
+template <typename T> struct tuple_select_result {
+    using type = void_to_monostate_t<awaitable_return_t<T>>;
+};
+
 template <typename Tuple> class TupleSelectCollectHandler {
 public:
     using ReturnType =
         apply_each_t<std::variant,
-                     transform_tuple_t<Tuple, unwrap_and_return_and_monostate>>;
+                     transform_tuple_t<Tuple, tuple_select_result>>;
 
     void init(Tuple &tuple) {
         // DO NOTHING
@@ -72,9 +74,9 @@ public:
     template <std::size_t I, typename Awaitable>
     corio::Lazy<void> do_co_await(CollectorBase &collector,
                                   Awaitable &awaitable) {
-        using Return = awaitable_return_t<unwrap_reference_t<Awaitable>>;
+        using T = awaitable_return_t<Awaitable>;
         try {
-            if constexpr (std::is_void_v<Return>) {
+            if constexpr (std::is_void_v<T>) {
                 co_await awaitable;
                 if (!result_.has_value()) {
                     result_ = corio::Result<ReturnType>::from_result(
@@ -98,7 +100,7 @@ public:
         }
     }
 
-    ReturnType unwrap_results() { return std::move(result_.value().result()); }
+    ReturnType collect_results() { return std::move(result_.value().result()); }
 
 private:
     std::optional<corio::Result<ReturnType>> result_;

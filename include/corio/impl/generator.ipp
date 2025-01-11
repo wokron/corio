@@ -73,9 +73,4 @@ template <typename T> T Generator<T>::current() {
     return std::move(promise.value().result());
 }
 
-template <typename T> auto Generator<T>::get_strand() const {
-    CORIO_ASSERT(handle_, "The handle is null");
-    return handle_.promise().strand();
-}
-
 } // namespace corio

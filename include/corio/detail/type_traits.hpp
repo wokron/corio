@@ -85,17 +85,6 @@ struct transform_tuple<std::tuple<Ts...>, Trait> {
 template <typename Tuple, template <typename> typename Trait>
 using transform_tuple_t = typename transform_tuple<Tuple, Trait>::type;
 
-template <typename Ref> struct unwrap_reference {
-    using type = Ref;
-};
-
-template <typename T> struct unwrap_reference<std::reference_wrapper<T>> {
-    using type = T;
-};
-
-template <typename Ref>
-using unwrap_reference_t = typename unwrap_reference<Ref>::type;
-
 template <typename T> struct result_value {};
 
 template <typename T> struct result_value<corio::Result<T>> {

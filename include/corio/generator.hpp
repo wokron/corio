@@ -36,8 +36,6 @@ public:
 
     T current();
 
-    auto get_strand() const;
-
 private:
     std::coroutine_handle<promise_type> handle_ = nullptr;
 };

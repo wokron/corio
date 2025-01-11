@@ -8,8 +8,7 @@ template <awaitable_iterable Iterable> class IterGatherCollectHandler {
 public:
     using Awaitable = std::iter_value_t<Iterable>;
     using AwaitableReturn = awaitable_return_t<Awaitable>;
-    using ReturnType =
-        std::vector<corio::Result<AwaitableReturn>>;
+    using ReturnType = std::vector<corio::Result<AwaitableReturn>>;
 
     void init(Iterable &iterable) {
         std::size_t total = std::size(iterable);
@@ -39,20 +38,20 @@ public:
         }
     }
 
-    ReturnType unwrap_results() { return std::move(results_); }
+    ReturnType collect_results() { return std::move(results_); }
 
 private:
     std::size_t rest_count_;
     ReturnType results_;
 };
 
-template <typename T> struct unwrap_and_return_and_result {
-    using type = corio::Result<awaitable_return_t<unwrap_reference_t<T>>>;
+template <typename T> struct tuple_gather_result {
+    using type = corio::Result<awaitable_return_t<T>>;
 };
 
 template <typename Tuple> class TupleGatherCollectHandler {
 public:
-    using ReturnType = transform_tuple_t<Tuple, unwrap_and_return_and_result>;
+    using ReturnType = transform_tuple_t<Tuple, tuple_gather_result>;
 
     void init(Tuple &tuple) {
         std::size_t total = std::tuple_size_v<Tuple>;
@@ -62,19 +61,17 @@ public:
     template <std::size_t I, typename Awaitable>
     corio::Lazy<void> do_co_await(CollectorBase &collector,
                                   Awaitable &awaitable) {
-        using Return = awaitable_return_t<
-            unwrap_reference_t<std::tuple_element_t<I, Tuple>>>;
+        using T = awaitable_return_t<Awaitable>;
         auto &result = std::get<I>(results_);
         try {
-            if constexpr (std::is_void_v<Return>) {
+            if constexpr (std::is_void_v<T>) {
                 co_await awaitable;
-                result = corio::Result<Return>::from_result();
+                result = corio::Result<T>::from_result();
             } else {
-                result = corio::Result<Return>::from_result(co_await awaitable);
+                result = corio::Result<T>::from_result(co_await awaitable);
             }
         } catch (...) {
-            result =
-                corio::Result<Return>::from_exception(std::current_exception());
+            result = corio::Result<T>::from_exception(std::current_exception());
         }
 
         rest_count_--;
@@ -83,7 +80,7 @@ public:
         }
     }
 
-    ReturnType unwrap_results() { return std::move(results_); }
+    ReturnType collect_results() { return std::move(results_); }
 
 private:
     std::size_t rest_count_;
