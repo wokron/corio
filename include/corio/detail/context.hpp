@@ -5,7 +5,7 @@
 
 namespace corio::detail {
 
-struct Background {
+struct TaskContext {
     SerialRunner runner;
 
     // Fields related to TaskSharedState

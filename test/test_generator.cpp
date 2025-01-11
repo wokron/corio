@@ -1,5 +1,5 @@
 #include <asio.hpp>
-#include <corio/detail/background.hpp>
+#include <corio/detail/context.hpp>
 #include <corio/generator.hpp>
 #include <corio/lazy.hpp>
 #include <doctest/doctest.h>
@@ -27,14 +27,14 @@ TEST_CASE("test generator") {
         };
 
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
         bool called = false;
         auto lazy = g(called);
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
 
         io_context.run();
@@ -68,14 +68,14 @@ TEST_CASE("test generator") {
         };
 
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
         bool called = false;
         auto lazy = g(called);
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
 
         io_context.run();
@@ -107,14 +107,14 @@ TEST_CASE("test generator") {
         };
 
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
         bool called = false;
         auto lazy = g(called);
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
 
         io_context.run();
@@ -137,14 +137,14 @@ TEST_CASE("test generator") {
         };
 
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
         bool called = false;
         auto lazy = g(called);
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
 
         io_context.run();

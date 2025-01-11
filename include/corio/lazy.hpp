@@ -8,7 +8,7 @@ namespace corio {
 
 namespace detail {
 template <typename T> class LazyPromise;
-class Background;
+class TaskContext;
 } // namespace detail
 
 template <typename T> class [[nodiscard]] Lazy {
@@ -48,9 +48,9 @@ public:
 
     const Result<T> &get_result() const;
 
-    void set_background(detail::Background *background);
+    void set_context(detail::TaskContext *context);
 
-    detail::Background *get_background() const;
+    detail::TaskContext *get_context() const;
 
     void execute();
 

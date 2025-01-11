@@ -1,6 +1,6 @@
 #include <asio.hpp>
 #include <chrono>
-#include <corio/detail/background.hpp>
+#include <corio/detail/context.hpp>
 #include <corio/lazy.hpp>
 #include <doctest/doctest.h>
 #include <memory>
@@ -15,12 +15,12 @@ TEST_CASE("test lazy") {
         auto lazy = f();
         CHECK(!lazy.is_finished());
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
         CHECK(!lazy.is_finished());
 
@@ -63,12 +63,12 @@ TEST_CASE("test lazy") {
         auto lazy = f2();
         CHECK(!lazy.is_finished());
         asio::io_context io_context;
-        corio::detail::Background bg = {
+        corio::detail::TaskContext ctx = {
             .runner = asio::make_strand<asio::any_io_executor>(
                 io_context.get_executor()),
         };
 
-        lazy.set_background(&bg);
+        lazy.set_context(&ctx);
         lazy.execute();
 
         io_context.run();

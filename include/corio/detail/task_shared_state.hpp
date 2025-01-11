@@ -1,7 +1,7 @@
 #pragma once
 
 #include "corio/detail/assert.hpp"
-#include "corio/detail/background.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/serial_runner.hpp"
 #include "corio/result.hpp"
 #include <asio.hpp>
@@ -20,9 +20,9 @@ public:
 
     explicit TaskSharedState(const SerialRunner &runner)
         : curr_runner_(runner) {
-        background_.runner = curr_runner_;
-        background_.mu_ptr = &mu_;
-        background_.curr_runner_ptr = &curr_runner_;
+        context_.runner = curr_runner_;
+        context_.mu_ptr = &mu_;
+        context_.curr_runner_ptr = &curr_runner_;
     }
 
     template <typename Executor>
@@ -112,7 +112,7 @@ public:
         return true;
     }
 
-    Background *background() { return &background_; }
+    TaskContext *context() { return &context_; }
 
     void set_entry_handle(std::coroutine_handle<> entry_handle) {
         entry_handle_ = entry_handle;
@@ -135,8 +135,8 @@ private:
     };
     std::optional<Resumer> resumer_;
 
-    // Background for all coroutines in this task
-    Background background_;
+    // Context for all coroutines in this task
+    TaskContext context_;
 };
 
 } // namespace corio::detail

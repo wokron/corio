@@ -25,7 +25,7 @@ struct SimpleAwaiter {
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
         PromiseType &promise = handle.promise();
-        auto executor = promise.background()->runner.get_executor();
+        auto executor = promise.context()->runner.get_executor();
         asio::post(executor, [h = handle, c = cancelled] {
             if (!*c) {
                 h.resume();

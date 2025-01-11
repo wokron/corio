@@ -10,7 +10,7 @@ template <detail::awaitable Awaitable>
 Task<T>::Task(Awaitable aw, const detail::SerialRunner &runner) {
     state_ = std::make_shared<SharedState>(runner);
     Lazy<void> entry = launch_task_(std::move(aw), state_);
-    entry.set_background(state_->background());
+    entry.set_context(state_->context());
     auto entry_handle = entry.get();
     state_->set_entry_handle(entry_handle);
     entry_handle.promise().set_destroy_when_exit(true);
@@ -89,7 +89,7 @@ public:
         }
 
         Promise &promise = handle.promise();
-        auto executor = promise.background()->runner.get_executor();
+        auto executor = promise.context()->runner.get_executor();
 
         state_->register_resumer(executor, handle, canceled_);
 
@@ -178,7 +178,7 @@ public:
     template <typename Promise>
     bool await_suspend(std::coroutine_handle<Promise> handle) {
         Promise &promise = handle.promise();
-        forked_runner_ = promise.background()->runner.fork_runner();
+        forked_runner_ = promise.context()->runner.fork_runner();
         return false;
     }
 

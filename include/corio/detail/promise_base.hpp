@@ -1,6 +1,6 @@
 #pragma once
 
-#include "corio/detail/background.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/concepts.hpp"
 #include "corio/detail/this_coro.hpp"
 #include <coroutine>
@@ -10,7 +10,7 @@ namespace corio::detail {
 class PromiseBase {
 public:
     ExecutorAwaiter await_transform(const executor_t &) {
-        auto executor = background_->runner.get_executor();
+        auto executor = context_->runner.get_executor();
         return {.executor = executor};
     }
 
@@ -20,14 +20,14 @@ public:
     }
 
 public:
-    void set_background(Background *background) {
-        background_ = background;
+    void set_context(TaskContext *context) {
+        context_ = context;
     }
 
-    Background *background() const { return background_; }
+    TaskContext *context() const { return context_; }
 
 private:
-    Background *background_ = nullptr;
+    TaskContext *context_ = nullptr;
 };
 
 struct FinalAwaiter {

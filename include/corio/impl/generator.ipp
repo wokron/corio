@@ -29,7 +29,7 @@ Generator<T>::chain_coroutine(
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
     PromiseType &caller_promise = caller_handle.promise();
-    promise.set_background(caller_promise.background());
+    promise.set_context(caller_promise.context());
     promise.set_caller_handle(caller_handle);
     return handle_;
 }

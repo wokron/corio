@@ -1,6 +1,6 @@
 #pragma once
 
-#include "corio/detail/background.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/concepts.hpp"
 #include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
@@ -54,7 +54,7 @@ public:
                     h.resume();
                 }
             };
-            auto executor = bg_->runner.get_executor();
+            auto executor = ctx_->runner.get_executor();
             asio::post(executor, do_resume);
             resume_handle_ = nullptr;
         }
@@ -65,14 +65,14 @@ protected:
     void register_handle_(std::coroutine_handle<Promise> h) {
         resume_handle_ = h;
         Promise &promise = h.promise();
-        bg_ = promise.background();
+        ctx_ = promise.context();
     }
 
-    Background *get_background_() const noexcept { return bg_; }
+    TaskContext *get_context_() const noexcept { return ctx_; }
 
 private:
     std::coroutine_handle<> resume_handle_ = nullptr;
-    Background *bg_;
+    TaskContext *ctx_;
 
     std::shared_ptr<bool> canceled_ = std::make_shared<bool>(false);
 };
@@ -89,7 +89,7 @@ public:
         std::size_t no = 0;
         for (auto &awaitable : iterable) {
             corio::Lazy<void> lazy = handler_.do_co_await(*this, no, awaitable);
-            lazy.set_background(get_background_());
+            lazy.set_context(get_context_());
             lazy.execute();
             lazies_.push_back(std::move(lazy)); // Keep lazy alive
             no++;
@@ -131,7 +131,7 @@ private:
                 lazy = handler_.template do_co_await<I>(*this, awaitable);
             }
 
-            lazy.set_background(get_background_());
+            lazy.set_context(get_context_());
             lazy.execute();
             lazies_.push_back(std::move(lazy)); // Keep lazy alive
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "corio/detail/background.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/serial_runner.hpp"
 #include <asio.hpp>
 #include <coroutine>
@@ -36,7 +36,7 @@ struct YieldAwaiter {
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
         PromiseType &promise = handle.promise();
-        auto executor = promise.background()->runner.get_executor();
+        auto executor = promise.context()->runner.get_executor();
         asio::post(executor, [h = handle, c = cancelled]() {
             bool is_cancelled = *c;
             if (!is_cancelled) {
@@ -69,7 +69,7 @@ template <typename Time> struct SleepAwaiter {
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
         PromiseType &promise = handle.promise();
-        auto executor = promise.background()->runner.get_executor();
+        auto executor = promise.context()->runner.get_executor();
         timer = asio::steady_timer(executor, expire_time);
         timer.value().async_wait([h = handle](const asio::error_code &ec) {
             if (!ec) {
@@ -101,17 +101,17 @@ public:
     template <typename PromiseType>
     bool await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
         PromiseType &promise = handle.promise();
-        Background *bg = promise.background();
-        auto &old_runner = bg->runner;
+        TaskContext *ctx = promise.context();
+        auto &old_runner = ctx->runner;
         if (old_runner.get_executor() == executor_) {
             return false;
         }
         auto new_runner = SerialRunner(executor_);
 
         {
-            std::lock_guard<std::mutex> lock(*(bg->mu_ptr));
-            *(bg->curr_runner_ptr) = new_runner;
-            bg->runner = new_runner;
+            std::lock_guard<std::mutex> lock(*(ctx->mu_ptr));
+            *(ctx->curr_runner_ptr) = new_runner;
+            ctx->runner = new_runner;
             asio::post(new_runner.get_executor(),
                        [h = handle]() { h.resume(); });
         }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "corio/detail/assert.hpp"
-#include "corio/detail/background.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/lazy_promise.hpp"
 #include "corio/lazy.hpp"
 
@@ -57,23 +57,23 @@ template <typename T> inline const Result<T> &Lazy<T>::get_result() const {
 }
 
 template <typename T>
-inline void Lazy<T>::set_background(detail::Background *background) {
+inline void Lazy<T>::set_context(detail::TaskContext *context) {
     CORIO_ASSERT(handle_, "The handle is null");
-    return handle_.promise().set_background(background);
+    return handle_.promise().set_context(context);
 }
 
 template <typename T>
-inline detail::Background *Lazy<T>::get_background() const {
+inline detail::TaskContext *Lazy<T>::get_context() const {
     CORIO_ASSERT(handle_, "The handle is null");
-    return handle_.promise().background();
+    return handle_.promise().context();
 }
 
 template <typename T> inline void Lazy<T>::execute() {
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
-    const detail::Background *bg = promise.background();
-    CORIO_ASSERT(bg != nullptr, "The background is not set");
-    asio::post(bg->runner.get_executor(), [h = handle_] { h.resume(); });
+    const detail::TaskContext *ctx = promise.context();
+    CORIO_ASSERT(ctx != nullptr, "The context is not set");
+    asio::post(ctx->runner.get_executor(), [h = handle_] { h.resume(); });
 }
 
 template <typename T>
@@ -83,7 +83,7 @@ Lazy<T>::chain_coroutine(std::coroutine_handle<PromiseType> caller_handle) {
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
     PromiseType &caller_promise = caller_handle.promise();
-    promise.set_background(caller_promise.background());
+    promise.set_context(caller_promise.context());
     promise.set_caller_handle(caller_handle);
     return handle_;
 }
