@@ -1,7 +1,7 @@
 #include <asio.hpp>
 #include <asio/experimental/awaitable_operators.hpp>
 #include <asio/experimental/channel.hpp>
-#include <corio/corio.hpp>
+#include <corio.hpp>
 #include <iostream>
 #include <marker.hpp>
 
