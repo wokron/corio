@@ -9,7 +9,9 @@
 
 namespace corio::detail {
 
-struct executor_t {};
+struct executor_t {
+    constexpr executor_t() noexcept {}
+};
 
 struct ExecutorAwaiter {
     bool await_ready() const noexcept { return true; }

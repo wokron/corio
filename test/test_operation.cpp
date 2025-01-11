@@ -1,4 +1,3 @@
-#include "asio/strand.hpp"
 #include "corio/run.hpp"
 #include "corio/task.hpp"
 #include <asio.hpp>
@@ -78,6 +77,39 @@ TEST_CASE("test operation") {
         };
 
         corio::block_on(pool1.get_executor(), f());
+    }
+
+    SUBCASE("test as default on") {
+        auto f = []() -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            auto timer =
+                corio::use_corio.as_default_on(asio::steady_timer(ex, 100us));
+
+            auto start = std::chrono::steady_clock::now();
+            co_await timer.async_wait();
+            auto end = std::chrono::steady_clock::now();
+
+            CHECK((end - start) >= 100us);
+        };
+
+        auto g = []() -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            using steady_timer =
+                corio::use_corio_t::as_default_on_t<asio::steady_timer>;
+            auto timer = steady_timer(ex, 100us);
+
+            auto start = std::chrono::steady_clock::now();
+            co_await timer.async_wait();
+            auto end = std::chrono::steady_clock::now();
+
+            CHECK((end - start) >= 100us);
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), f());
+
+        corio::block_on(pool.get_executor(), g());
     }
 }
 

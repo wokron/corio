@@ -8,8 +8,6 @@
 
 namespace corio::detail {
 
-struct use_corio_t {};
-
 template <typename Initiation, typename PackedInitArgs, typename... Args>
 class Operation {
 public:
@@ -78,21 +76,3 @@ private:
 };
 
 } // namespace corio::detail
-
-namespace asio {
-
-template <typename... Args>
-struct async_result<corio::detail::use_corio_t, void(Args...)> {
-
-    template <class Initiation, class... InitArgs>
-    static auto initiate(Initiation &&initiation, corio::detail::use_corio_t,
-                         InitArgs &&...args) {
-        auto packed_init_args =
-            std::make_tuple(std::forward<InitArgs>(args)...);
-        using PackagedInitArgs = decltype(packed_init_args);
-        return corio::detail::Operation<Initiation, PackagedInitArgs, Args...>{
-            std::move(initiation), std::move(packed_init_args)};
-    }
-};
-
-} // namespace asio
