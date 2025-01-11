@@ -6,7 +6,9 @@ namespace corio::this_coro {
 
 inline constexpr corio::detail::executor_t executor;
 
-inline auto yield();
+inline constexpr corio::detail::yield_t yield;
+
+inline auto do_yield();
 
 template <typename Rep, typename Period>
 inline auto sleep_for(const std::chrono::duration<Rep, Period> &duration);

@@ -27,8 +27,7 @@ TEST_CASE("test select") {
     SUBCASE("select basic") {
         auto f = [&]() -> corio::Lazy<void> {
             auto start = std::chrono::steady_clock::now();
-            auto r = co_await corio::select(sleep(1s, 1),
-                                            sleep(500us, 2),
+            auto r = co_await corio::select(sleep(1s, 1), sleep(500us, 2),
                                             corio::this_coro::sleep_for(10s));
             auto end = std::chrono::steady_clock::now();
             CHECK(r.index() == 1);
@@ -54,7 +53,7 @@ TEST_CASE("test select") {
             auto r = co_await corio::select(corio::this_coro::sleep_for(100us),
                                             std::move(t));
             CHECK(r.index() == 0);
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
             CHECK(called);
         };
 
@@ -71,9 +70,10 @@ TEST_CASE("test select") {
 
         auto g = [&]() -> corio::Lazy<void> {
             auto start = std::chrono::steady_clock::now();
-            CHECK_THROWS_AS(co_await corio::select(corio::this_coro::sleep_for(1s),
-                                                   co_await corio::spawn(f())),
-                            std::runtime_error);
+            CHECK_THROWS_AS(
+                co_await corio::select(corio::this_coro::sleep_for(1s),
+                                       co_await corio::spawn(f())),
+                std::runtime_error);
             auto end = std::chrono::steady_clock::now();
             CHECK((end - start) < 1s);
         };
@@ -183,7 +183,7 @@ TEST_CASE("test select iter") {
 
             auto r = co_await corio::select(std::move(vec));
             CHECK(r.first == 10); // Sleep task finishes first
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
             for (auto &&flag : flags) {
                 CHECK(flag);
             }

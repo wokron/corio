@@ -23,6 +23,10 @@ struct ExecutorAwaiter {
     asio::any_io_executor executor;
 };
 
+struct yield_t {
+    constexpr yield_t() noexcept {}
+};
+
 struct YieldAwaiter {
     YieldAwaiter() = default;
 

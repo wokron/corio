@@ -1,8 +1,10 @@
 #pragma once
 
-#include "corio/detail/context.hpp"
 #include "corio/detail/concepts.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/this_coro.hpp"
+#include "corio/operation.hpp"
+#include <asio.hpp>
 #include <coroutine>
 
 namespace corio::detail {
@@ -14,15 +16,38 @@ public:
         return {.executor = executor};
     }
 
+    auto await_transform(const yield_t &) {
+        return asio::post(context_->runner.get_executor(), corio::use_corio);
+    }
+
+    template <typename Rep, typename Period>
+    auto await_transform(const std::chrono::duration<Rep, Period> &duration) {
+        return SleepAwaiter(duration);
+    }
+
+    template <typename Clock, typename Duration>
+    auto await_transform(
+        const std::chrono::time_point<Clock, Duration> &time_point) {
+        return SleepAwaiter(time_point);
+    }
+
+    template <typename Clock>
+    auto await_transform(asio::basic_waitable_timer<Clock> &timer) {
+        return timer.async_wait(corio::use_corio);
+    }
+
+    template <typename Executor>
+    auto await_transform(const Executor &executor) {
+        return ExecutorSwitchAwaiter(executor);
+    }
+
     template <awaitable Awaitable>
     Awaitable &&await_transform(Awaitable &&awaitable) {
         return std::forward<Awaitable>(awaitable);
     }
 
 public:
-    void set_context(TaskContext *context) {
-        context_ = context;
-    }
+    void set_context(TaskContext *context) { context_ = context; }
 
     TaskContext *context() const { return context_; }
 

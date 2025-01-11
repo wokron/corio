@@ -4,7 +4,7 @@
 
 namespace corio::this_coro {
 
-inline auto yield() { return corio::detail::YieldAwaiter{}; }
+inline auto do_yield() { return corio::detail::YieldAwaiter{}; }
 
 template <typename Rep, typename Period>
 auto sleep_for(const std::chrono::duration<Rep, Period> &duration) {

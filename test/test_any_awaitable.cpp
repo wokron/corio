@@ -43,7 +43,7 @@ TEST_CASE("test any awaitable") {
 
         auto f = [&]() -> corio::Lazy<void> { co_return; };
         AnyAwaitableType a1 = f();
-        AnyAwaitableType a2 = corio::this_coro::yield();
+        AnyAwaitableType a2 = corio::this_coro::do_yield();
 
         bool called = false;
         auto g = [&]() -> corio::Lazy<void> {

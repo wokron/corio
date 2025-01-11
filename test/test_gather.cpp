@@ -124,13 +124,13 @@ TEST_CASE("test try gather") {
 
             CHECK_THROWS(co_await corio::try_gather(t1, std::move(t2),
                                                     exception_lazy()));
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
             CHECK(!called1);
             CHECK(called2);
 
             CHECK_THROWS(
                 co_await corio::try_gather(std::move(t1), exception_lazy()));
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
             CHECK(called1);
         };
 
@@ -249,7 +249,7 @@ TEST_CASE("test try gather iter") {
             vec[2] = co_await corio::spawn(exception_lazy());
 
             CHECK_THROWS(co_await corio::try_gather(std::move(vec)));
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
             CHECK(called1);
             CHECK(called2);
         };

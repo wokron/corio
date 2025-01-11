@@ -39,7 +39,7 @@ TEST_CASE("test this_coro awaitable") {
         bool called = false;
         auto f = [&]() -> corio::Lazy<void> {
             for (int i = 0; i < 5; i++) {
-                co_await corio::this_coro::yield();
+                co_await corio::this_coro::do_yield();
             }
             called = true;
         };
@@ -58,7 +58,7 @@ TEST_CASE("test this_coro awaitable") {
         int count = 0;
         auto f = [&]() -> corio::Lazy<void> {
             for (int i = 0; i < 5; i++) {
-                co_await corio::this_coro::yield();
+                co_await corio::this_coro::do_yield();
                 count++;
             }
             called = true;
@@ -66,8 +66,8 @@ TEST_CASE("test this_coro awaitable") {
         };
         auto g = [&]() -> corio::Lazy<void> {
             auto task = co_await corio::spawn(f());
-            co_await corio::this_coro::yield();
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
+            co_await corio::this_coro::do_yield();
             task.abort();
             co_await task;
         };
@@ -167,8 +167,8 @@ TEST_CASE("test this_coro awaitable") {
         };
         auto g = [&]() -> corio::Lazy<void> {
             auto task = co_await corio::spawn(f());
-            co_await corio::this_coro::yield();
-            co_await corio::this_coro::yield();
+            co_await corio::this_coro::do_yield();
+            co_await corio::this_coro::do_yield();
             task.abort();
             co_await task;
         };
@@ -257,9 +257,9 @@ TEST_CASE("test coroutine roam") {
             REQUIRE(ex == ex1);
             while (true) {
                 co_await corio::this_coro::roam_to(ex2);
-                co_await corio::this_coro::yield();
+                co_await corio::this_coro::do_yield();
                 co_await corio::this_coro::roam_to(ex1);
-                co_await corio::this_coro::yield();
+                co_await corio::this_coro::do_yield();
             }
         };
 
@@ -274,5 +274,120 @@ TEST_CASE("test coroutine roam") {
         };
 
         corio::block_on(p1.get_executor(), g());
+    }
+}
+
+TEST_CASE("test awaits") {
+    SUBCASE("await yield") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            for (int i = 0; i < 5; i++) {
+                co_await corio::this_coro::yield;
+            }
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::spawn_background(pool.executor(), f());
+
+        pool.join();
+
+        CHECK(called);
+    }
+
+    SUBCASE("await time duration") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            co_await 100us;
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        auto start = std::chrono::steady_clock::now();
+
+        corio::spawn_background(pool.executor(), f());
+
+        pool.join();
+
+        auto end = std::chrono::steady_clock::now();
+
+        CHECK(called);
+        CHECK((end - start) >= 100us);
+    }
+
+    SUBCASE("await time point") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            auto now_time = std::chrono::steady_clock::now();
+            co_await (now_time + 100us);
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        auto start = std::chrono::steady_clock::now();
+
+        corio::spawn_background(pool.executor(), f());
+
+        pool.join();
+
+        auto end = std::chrono::steady_clock::now();
+
+        CHECK(called);
+        CHECK((end - start) >= 100us);
+    }
+
+    SUBCASE("await asio timer") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            asio::steady_timer timer(ex, 100us);
+            co_await timer;
+            timer.expires_after(100us);
+            co_await timer;
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        auto start = std::chrono::steady_clock::now();
+
+        corio::spawn_background(pool.executor(), f());
+
+        pool.join();
+
+        auto end = std::chrono::steady_clock::now();
+
+        CHECK(called);
+        CHECK((end - start) >= 200us);
+    }
+
+    SUBCASE("await executor") {
+        asio::thread_pool p1(1), p2(1);
+
+        auto f = [&](asio::any_io_executor ex1,
+                     asio::any_io_executor ex2) -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex1);
+            auto id1 = get_tid();
+
+            co_await ex2;
+            ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex2);
+            auto id2 = get_tid();
+
+            co_await ex1;
+            ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex1);
+            auto id3 = get_tid();
+
+            CHECK(id1 == id3);
+            CHECK(id1 != id2);
+        };
+
+        corio::block_on(p1.get_executor(),
+                        f(p1.get_executor(), p2.get_executor()));
     }
 }
