@@ -21,7 +21,10 @@ public:
     std::suspend_always initial_suspend() { return {}; }
     FinalAwaiter final_suspend() noexcept { return {}; }
 
-    void return_void() { value_ = std::nullopt; }
+    void return_void() {
+        value_ = std::nullopt;
+        finished_ = true;
+    }
     void unhandled_exception() {
         value_ = corio::Result<T>::from_exception(std::current_exception());
     }
@@ -41,9 +44,12 @@ public:
 
     corio::Result<T> &value() { return value_.value(); }
 
+    bool is_finished() const { return finished_; }
+
 private:
     std::optional<corio::Result<T>> value_ = std::nullopt;
     std::coroutine_handle<> caller_handle_ = nullptr;
+    bool finished_ = false;
 };
 
 } // namespace corio::detail

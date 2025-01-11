@@ -22,6 +22,10 @@ TEST_CASE("test generator") {
                 arr.push_back(gen.current());
             }
 
+            CHECK(!co_await gen);
+            CHECK(!co_await gen);
+            CHECK(!co_await gen);
+
             CHECK(arr == std::vector<int>{1, 2, 3});
             called = true;
         };

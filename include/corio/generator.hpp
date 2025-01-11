@@ -37,6 +37,8 @@ public:
 
     T current();
 
+    bool is_finished() const;
+
 private:
     std::coroutine_handle<promise_type> handle_ = nullptr;
 };

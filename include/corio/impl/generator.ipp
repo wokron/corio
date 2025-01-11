@@ -40,7 +40,7 @@ template <typename T> struct NextAwaiter {
 public:
     NextAwaiter(Generator<T> &gen) : gen_(gen) {}
 
-    bool await_ready() const noexcept { return false; }
+    bool await_ready() const { return gen_.is_finished(); }
 
     template <typename PromiseType>
     std::coroutine_handle<>
@@ -71,6 +71,12 @@ template <typename T> T Generator<T>::current() {
     promise_type &promise = handle_.promise();
     CORIO_ASSERT(has_current(), "No more elements");
     return std::move(promise.value().result());
+}
+
+template <typename T> bool Generator<T>::is_finished() const {
+    CORIO_ASSERT(handle_ != nullptr, "Invalid generator");
+    promise_type &promise = handle_.promise();
+    return promise.is_finished();
 }
 
 template <typename T, typename Fn>
