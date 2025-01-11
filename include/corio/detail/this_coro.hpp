@@ -1,7 +1,10 @@
 #pragma once
 
+#include "corio/detail/background.hpp"
+#include "corio/detail/serial_runner.hpp"
 #include <asio.hpp>
 #include <coroutine>
+#include <mutex>
 #include <optional>
 
 namespace corio::detail {
@@ -83,6 +86,40 @@ template <typename Time> struct SleepAwaiter {
 
     Time expire_time;
     std::optional<asio::steady_timer> timer;
+};
+
+template <typename Executor> class ExecutorSwitchAwaiter {
+public:
+    explicit ExecutorSwitchAwaiter(const Executor &executor)
+        : executor_(executor) {}
+
+public:
+    bool await_ready() const noexcept { return false; }
+
+    template <typename PromiseType>
+    bool await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
+        PromiseType &promise = handle.promise();
+        Background *bg = promise.background();
+        auto &old_runner = bg->runner;
+        if (old_runner.get_executor() == executor_) {
+            return false;
+        }
+        auto new_runner = SerialRunner(executor_);
+
+        {
+            std::lock_guard<std::mutex> lock(*(bg->mu_ptr));
+            *(bg->curr_runner_ptr) = new_runner;
+            bg->runner = new_runner;
+            asio::post(new_runner.get_executor(),
+                       [h = handle]() { h.resume(); });
+        }
+        return true;
+    }
+
+    void await_resume() noexcept {}
+
+private:
+    Executor executor_;
 };
 
 } // namespace corio::detail

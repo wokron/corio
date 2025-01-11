@@ -21,7 +21,8 @@ public:
     explicit TaskSharedState(const SerialRunner &runner)
         : curr_runner_(runner) {
         background_.runner = curr_runner_;
-        // TODO: backgroud back access to the shared state
+        background_.mu_ptr = &mu_;
+        background_.curr_runner_ptr = &curr_runner_;
     }
 
     template <typename Executor>
@@ -79,22 +80,34 @@ public:
 
         auto task_executor = curr_runner_.get_executor();
 
-        asio::post(task_executor, [state = super::shared_from_this(),
-                                   prev_task_executor = task_executor] {
-            std::lock_guard lock = state->lock();
-            if (state->entry_handle_ == nullptr) {
-                return; // The task is already finished
+        struct AbortChaser {
+            std::shared_ptr<TaskSharedState> state;
+            asio::any_io_executor prev_task_executor;
+
+            void operator()() {
+                auto lock = state->lock();
+                if (state->entry_handle_ == nullptr) {
+                    return; // The task is already finished
+                }
+                auto task_executor = state->curr_runner_.get_executor();
+                if (task_executor != prev_task_executor) {
+                    // The task is switched to another executor. we need to
+                    // cancel task on the executor the task is running, so we
+                    // post the task to the executor and call this function
+                    // again.
+                    prev_task_executor = task_executor;
+                    asio::post(task_executor, *this);
+                    return;
+                }
+                state->entry_handle_.destroy();
+                state->entry_handle_ = nullptr;
+                state->request_task_resume();
             }
-            auto task_executor = state->curr_runner_.get_executor();
-            if (task_executor != prev_task_executor) {
-                // TODO: re-post the task to the new executor, temporarily
-                // terminate the program here
-                std::terminate();
-            }
-            state->entry_handle_.destroy();
-            state->entry_handle_ = nullptr;
-            state->request_task_resume();
-        });
+        };
+
+        asio::post(task_executor,
+                   AbortChaser{.state = super::shared_from_this(),
+                               .prev_task_executor = task_executor});
 
         return true;
     }

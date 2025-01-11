@@ -1,6 +1,6 @@
-#include "asio/thread_pool.hpp"
-#include "corio/lazy.hpp"
 #include <asio.hpp>
+#include <corio/lazy.hpp>
+#include <corio/run.hpp>
 #include <corio/task.hpp>
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
@@ -186,5 +186,93 @@ TEST_CASE("test this_coro awaitable") {
 
         CHECK(!called);
         CHECK(duration < 1ms);
+    }
+}
+
+namespace {
+
+#ifdef __clang__
+
+[[clang::optnone]] std::thread::id get_tid() {
+    return std::this_thread::get_id();
+}
+
+#else
+
+std::thread::id get_tid() { return std::this_thread::get_id(); }
+
+#endif
+
+} // namespace
+
+TEST_CASE("test coroutine roam") {
+    SUBCASE("basic") {
+        asio::thread_pool p1(1), p2(1);
+
+        auto f = [&](asio::any_io_executor ex1,
+                     asio::any_io_executor ex2) -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex1);
+            auto id1 = get_tid();
+
+            co_await corio::this_coro::roam_to(ex2);
+            ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex2);
+            auto id2 = get_tid();
+
+            co_await corio::this_coro::roam_to(ex1);
+            ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex1);
+            auto id3 = get_tid();
+
+            co_await corio::this_coro::roam_to(ex2);
+            ex = co_await corio::this_coro::executor;
+            CHECK(ex == ex2);
+            auto id4 = get_tid();
+
+            CHECK(id1 == id3);
+            CHECK(id2 == id4);
+            CHECK(id1 != id2);
+        };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            co_await corio::this_coro::roam_to(ex); // no effect
+            auto ex2 = co_await corio::this_coro::executor;
+            CHECK(ex == ex2);
+        };
+
+        corio::block_on(p1.get_executor(),
+                        f(p1.get_executor(), p2.get_executor()));
+
+        corio::block_on(p1.get_executor(), g());
+    }
+
+    SUBCASE("with cancel") {
+        asio::thread_pool p1(1), p2(1);
+
+        auto f = [](asio::any_io_executor ex1,
+                    asio::any_io_executor ex2) -> corio::Lazy<void> {
+            auto ex = co_await corio::this_coro::executor;
+            REQUIRE(ex == ex1);
+            while (true) {
+                co_await corio::this_coro::roam_to(ex2);
+                co_await corio::this_coro::yield();
+                co_await corio::this_coro::roam_to(ex1);
+                co_await corio::this_coro::yield();
+            }
+        };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            auto t =
+                co_await corio::spawn(f(p1.get_executor(), p2.get_executor()));
+
+            co_await corio::this_coro::sleep_for(500us);
+
+            t.abort();
+            CHECK_THROWS(co_await t);
+        };
+
+        corio::block_on(p1.get_executor(), g());
     }
 }

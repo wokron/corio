@@ -16,4 +16,8 @@ auto sleep_until(const std::chrono::time_point<Clock, Duration> &time_point) {
     return corio::detail::SleepAwaiter(time_point);
 }
 
+template <typename Executor> inline auto roam_to(const Executor &executor) {
+    return corio::detail::ExecutorSwitchAwaiter(executor);
+}
+
 } // namespace corio::this_coro
