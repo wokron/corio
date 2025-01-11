@@ -18,14 +18,14 @@ TEST_CASE("test serial runner") {
 
     SUBCASE("accept strand") {
         asio::io_context io_context;
-        auto strand =
-            asio::make_strand<asio::any_io_executor>(io_context.get_executor());
+        auto strand = asio::make_strand(io_context.get_executor());
         corio::detail::SerialRunner runner(strand);
         CHECK(runner.get_executor() == strand);
         CHECK(runner.get_inner_executor() == strand.get_inner_executor());
 
         auto runner2 = runner.fork_runner();
         CHECK(runner2.get_executor() != strand); // Another strand after fork
+        CHECK(runner2.get_inner_executor() == runner.get_inner_executor());
     }
 
     SUBCASE("default constructor and assign") {
@@ -42,7 +42,7 @@ TEST_CASE("test serial runner") {
         runner = corio::detail::SerialRunner();
         CHECK(!runner);
 
-        auto strand = asio::make_strand<asio::any_io_executor>(ex);
+        auto strand = asio::make_strand(ex);
         runner = corio::detail::SerialRunner(strand);
         CHECK(runner.get_executor() == strand);
         CHECK(runner.get_inner_executor() == strand.get_inner_executor());

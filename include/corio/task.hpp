@@ -1,36 +1,28 @@
 #pragma once
 
-#include "corio/detail/assert.hpp"
+#include "corio/detail/concepts.hpp"
+#include "corio/detail/serial_runner.hpp"
 #include "corio/detail/task_shared_state.hpp"
 #include "corio/detail/type_traits.hpp"
-#include "corio/lazy.hpp"
-#include "corio/result.hpp"
-#include <asio.hpp>
-#include <coroutine>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <utility>
 
 namespace corio {
 
 template <typename T> class Task;
+template <typename T> class Lazy;
 
 template <detail::awaitable Awaitable>
 [[nodiscard]] Lazy<Task<detail::awaitable_return_t<Awaitable>>>
-spawn(Awaitable awaitable);
+spawn(Awaitable aw);
 
-template <detail::awaitable Awaitable>
+template <typename Executor, detail::awaitable Awaitable>
 [[nodiscard]] Task<detail::awaitable_return_t<Awaitable>>
-spawn(asio::any_io_executor executor, Awaitable awaitable);
+spawn(const Executor &executor, Awaitable aw);
 
 template <detail::awaitable Awaitable>
-Lazy<void> spawn_background(Awaitable awaitable);
+Lazy<void> spawn_background(Awaitable aw);
 
-template <detail::awaitable Awaitable>
-void spawn_background(asio::any_io_executor executor, Awaitable awaitable);
-
-template <typename T> class TaskAwaiter;
+template <typename Executor, detail::awaitable Awaitable>
+void spawn_background(const Executor &executor, Awaitable aw);
 
 template <typename T> class AbortHandle;
 
@@ -39,7 +31,11 @@ public:
     using SharedState = detail::TaskSharedState<T>;
 
     template <detail::awaitable Awaitable>
-    explicit Task(Awaitable lazy, asio::any_io_executor executor);
+    explicit Task(Awaitable aw, const detail::SerialRunner &runner);
+
+    template <detail::awaitable Awaitable, typename Executor>
+    explicit Task(Awaitable aw, const Executor &executor)
+        : Task(std::move(aw), detail::SerialRunner{executor}) {}
 
 public:
     Task() = default;
@@ -69,19 +65,21 @@ public:
 
     bool detach();
 
-    TaskAwaiter<T> operator co_await() const;
+    auto operator co_await() const;
 
 private:
     template <detail::awaitable Awaitable>
-    static Lazy<void> launch_task_(Awaitable awaitable,
-                                   std::shared_ptr<SharedState> shared_state);
+    static Lazy<void> launch_task_(Awaitable aw,
+                                   std::shared_ptr<SharedState> state);
 
-    std::shared_ptr<SharedState> state_ = nullptr;
+private:
+    std::shared_ptr<SharedState> state_;
 };
 
 template <typename T> class AbortHandle {
 public:
     using SharedState = typename Task<T>::SharedState;
+
     explicit AbortHandle(std::shared_ptr<SharedState> state) : state_(state) {}
 
     bool abort();

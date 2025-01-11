@@ -1,6 +1,5 @@
 #pragma once
 
-#include "corio/detail/lazy_promise.hpp"
 #include "corio/detail/promise_base.hpp"
 #include "corio/result.hpp"
 #include <coroutine>

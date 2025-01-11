@@ -1,8 +1,7 @@
-#include "asio/thread_pool.hpp"
-#include "corio/gather.hpp"
-#include "corio/run.hpp"
-#include <algorithm>
+#include <asio.hpp>
+#include <corio/detail/background.hpp>
 #include <corio/generator.hpp>
+#include <corio/lazy.hpp>
 #include <doctest/doctest.h>
 #include <stdexcept>
 
@@ -15,7 +14,7 @@ TEST_CASE("test generator") {
             co_yield 3;
         };
 
-        auto g = [&]() -> corio::Lazy<void> {
+        auto g = [&](bool &called) -> corio::Lazy<void> {
             auto gen = f();
             std::vector<int> arr;
 
@@ -24,10 +23,23 @@ TEST_CASE("test generator") {
             }
 
             CHECK(arr == std::vector<int>{1, 2, 3});
+            called = true;
         };
 
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), g());
+        asio::io_context io_context;
+        corio::detail::Background bg = {
+            .runner = asio::make_strand<asio::any_io_executor>(
+                io_context.get_executor()),
+        };
+
+        bool called = false;
+        auto lazy = g(called);
+        lazy.set_background(&bg);
+        lazy.execute();
+
+        io_context.run();
+
+        CHECK(called);
     }
 
     SUBCASE("generator with exception") {
@@ -38,7 +50,7 @@ TEST_CASE("test generator") {
             co_yield 3;
         };
 
-        auto g = [&]() -> corio::Lazy<void> {
+        auto g = [&](bool &called) -> corio::Lazy<void> {
             bool catched = false;
             auto gen = f();
             std::vector<int> arr;
@@ -52,38 +64,23 @@ TEST_CASE("test generator") {
             }
             CHECK(catched);
             CHECK(arr == std::vector<int>{1, 2});
+            called = true;
         };
 
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), g());
-    }
-
-    SUBCASE("generator with lazy") {
-        auto f = [](int i) -> corio::Lazy<int> { co_return i; };
-
-        auto g = [&]() -> corio::Generator<corio::Task<int>> {
-            co_yield co_await corio::spawn(f(1));
-            co_yield co_await corio::spawn(f(2));
-            co_yield co_await corio::spawn(f(3));
+        asio::io_context io_context;
+        corio::detail::Background bg = {
+            .runner = asio::make_strand<asio::any_io_executor>(
+                io_context.get_executor()),
         };
 
-        auto h = [&]() -> corio::Lazy<void> {
-            auto gen = g();
-            std::vector<corio::Task<int>> arr;
+        bool called = false;
+        auto lazy = g(called);
+        lazy.set_background(&bg);
+        lazy.execute();
 
-            while (co_await gen) {
-                arr.push_back(gen.current());
-            }
+        io_context.run();
 
-            auto result = co_await corio::gather(arr);
-            CHECK(result.size() == 3);
-            CHECK(result[0].result() == 1);
-            CHECK(result[1].result() == 2);
-            CHECK(result[2].result() == 3);
-        };
-
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), h());
+        CHECK(called);
     }
 
     SUBCASE("generator with move-only type") {
@@ -93,7 +90,7 @@ TEST_CASE("test generator") {
             co_yield std::make_unique<int>(3);
         };
 
-        auto g = [&]() -> corio::Lazy<void> {
+        auto g = [&](bool &called) -> corio::Lazy<void> {
             auto gen = f();
             std::vector<std::unique_ptr<int>> arr;
 
@@ -105,28 +102,53 @@ TEST_CASE("test generator") {
             CHECK(*arr[0] == 1);
             CHECK(*arr[1] == 2);
             CHECK(*arr[2] == 3);
+
+            called = true;
         };
 
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), g());
+        asio::io_context io_context;
+        corio::detail::Background bg = {
+            .runner = asio::make_strand<asio::any_io_executor>(
+                io_context.get_executor()),
+        };
+
+        bool called = false;
+        auto lazy = g(called);
+        lazy.set_background(&bg);
+        lazy.execute();
+
+        io_context.run();
+
+        CHECK(called);
     }
 
-    SUBCASE("use async_for") {
+    SUBCASE("use async for-loop") {
         auto f = []() -> corio::Generator<int> {
             co_yield 1;
             co_yield 2;
             co_yield 3;
         };
 
-        auto g = [&]() -> corio::Lazy<void> {
+        auto g = [&](bool& called) -> corio::Lazy<void> {
             std::vector<int> arr;
-            async_for(auto e, f()) {
-                arr.push_back(e);
-            }
+            CORIO_ASYNC_FOR(auto e, f()) { arr.push_back(e); }
             CHECK(arr == std::vector<int>{1, 2, 3});
+            called = true;
         };
 
-        asio::thread_pool pool(1);
-        corio::block_on(pool.get_executor(), g());
+        asio::io_context io_context;
+        corio::detail::Background bg = {
+            .runner = asio::make_strand<asio::any_io_executor>(
+                io_context.get_executor()),
+        };
+
+        bool called = false;
+        auto lazy = g(called);
+        lazy.set_background(&bg);
+        lazy.execute();
+
+        io_context.run();
+
+        CHECK(called);
     }
 }

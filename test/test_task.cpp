@@ -1,28 +1,21 @@
-#include "asio/thread_pool.hpp"
-#include "corio/detail/defer.hpp"
-#include "corio/lazy.hpp"
 #include <asio.hpp>
-#include <chrono>
 #include <corio/task.hpp>
 #include <doctest/doctest.h>
-#include <thread>
-#include <utility>
 
 namespace {
 
-struct CancelableSimpleAwaiter {
+struct SimpleAwaiter {
     bool await_ready() noexcept { return false; }
 
-    CancelableSimpleAwaiter() = default;
+    SimpleAwaiter() : cancelled(std::make_shared<bool>(false)) {}
 
-    CancelableSimpleAwaiter(const CancelableSimpleAwaiter &) = delete;
-    CancelableSimpleAwaiter &
-    operator=(const CancelableSimpleAwaiter &) = delete;
+    SimpleAwaiter(const SimpleAwaiter &) = delete;
+    SimpleAwaiter &operator=(const SimpleAwaiter &) = delete;
 
-    CancelableSimpleAwaiter(CancelableSimpleAwaiter &&other)
+    SimpleAwaiter(SimpleAwaiter &&other)
         : cancelled(std::exchange(other.cancelled, nullptr)) {}
 
-    CancelableSimpleAwaiter &operator=(CancelableSimpleAwaiter &&other) {
+    SimpleAwaiter &operator=(SimpleAwaiter &&other) {
         if (this != &other) {
             cancelled = std::exchange(other.cancelled, nullptr);
         }
@@ -32,9 +25,8 @@ struct CancelableSimpleAwaiter {
     template <typename PromiseType>
     void await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
         PromiseType &promise = handle.promise();
-        CORIO_ASSERT(promise.executor(), "The executor is not set");
-        auto &strand = promise.strand();
-        asio::post(strand, [h = handle, c = cancelled] {
+        auto executor = promise.background()->runner.get_executor();
+        asio::post(executor, [h = handle, c = cancelled] {
             if (!*c) {
                 h.resume();
             }
@@ -43,13 +35,13 @@ struct CancelableSimpleAwaiter {
 
     void await_resume() noexcept {}
 
-    ~CancelableSimpleAwaiter() {
+    ~SimpleAwaiter() {
         if (cancelled != nullptr) {
             *cancelled = true;
         }
     }
 
-    std::shared_ptr<bool> cancelled = std::make_shared<bool>(false);
+    std::shared_ptr<bool> cancelled;
 };
 
 } // namespace
@@ -59,6 +51,8 @@ TEST_CASE("test task") {
     SUBCASE("spawn tasks") {
         bool called = false;
         asio::thread_pool pool(2);
+        auto strand1 = asio::make_strand(pool.get_executor());
+        auto strand2 = asio::make_strand(pool.get_executor());
 
         auto f1 = [&]() -> corio::Lazy<void> {
             called = true;
@@ -74,8 +68,8 @@ TEST_CASE("test task") {
             called2 = true;
         };
 
-        auto t1 = corio::spawn(pool.get_executor(), f2());
-        corio::spawn_background(pool.get_executor(), f3());
+        auto t1 = corio::spawn(strand1, f2());
+        corio::spawn_background(strand2, f3());
 
         pool.join();
 
@@ -86,7 +80,7 @@ TEST_CASE("test task") {
     }
 
     SUBCASE("spawn any awaitable") {
-        asio::thread_pool pool(1);
+        asio::thread_pool pool(2);
 
         bool called = false;
 
@@ -97,8 +91,7 @@ TEST_CASE("test task") {
 
             auto t2 = corio::spawn(pool.get_executor(), std::move(t));
 
-            auto t3 =
-                corio::spawn(pool.get_executor(), CancelableSimpleAwaiter{});
+            auto t3 = corio::spawn(pool.get_executor(), SimpleAwaiter{});
 
             CHECK(co_await t2 == 42);
             co_await t3;
@@ -106,7 +99,7 @@ TEST_CASE("test task") {
             called = true;
         };
 
-        corio::spawn_background(pool.get_executor(), g());
+        corio::spawn_background(asio::make_strand(pool.get_executor()), g());
 
         pool.join();
 
@@ -115,61 +108,60 @@ TEST_CASE("test task") {
 
     SUBCASE("abort task basic") {
         bool called = false;
-        int count = 0;
-        auto f = [&]() -> corio::Lazy<void> {
-            co_await CancelableSimpleAwaiter{};
-            count++;
-        };
-        auto g = [&]() -> corio::Lazy<int> {
+        asio::thread_pool pool(2);
+        auto strand = asio::make_strand(pool.get_executor());
+
+        auto f = []() -> corio::Lazy<int> {
             while (true) {
-                co_await f();
+                co_await SimpleAwaiter{};
             }
             co_return 42;
         };
+        auto g = [&]() -> corio::Lazy<void> {
+            auto task = co_await corio::spawn(f());
+            bool ok = task.abort();
+            CHECK(ok);
+            CHECK_THROWS_AS(co_await task, corio::CancellationError);
+            CHECK(task.is_finished());
+            CHECK(task.is_cancelled());
+            called = true;
+        };
 
-        SUBCASE("abort task 1") {
-            auto k = [&]() -> corio::Lazy<void> {
-                auto task = co_await corio::spawn(g());
-                auto cancel_fn =
-                    [](corio::Task<int> &task) -> corio::Lazy<void> {
-                    task.abort();
-                    co_return;
-                };
-                auto task_cancel = co_await corio::spawn(cancel_fn(task));
-                co_await task_cancel;
-                called = true;
-            };
+        corio::spawn_background(strand, g());
 
-            asio::thread_pool pool(1); // Single thread to keep the order
-            corio::spawn_background(pool.get_executor(), k());
+        pool.join();
 
-            pool.join();
+        CHECK(called);
+    }
 
-            CHECK(called);
-            CHECK(count > 0);
-        }
+    SUBCASE("abort task cascade") {
+        bool called = false;
+        asio::thread_pool pool(2);
+        auto strand = asio::make_strand(pool.get_executor());
 
-        SUBCASE("abort task 2") {
-            auto k = [&]() -> corio::Lazy<void> {
-                auto task = co_await corio::spawn(g());
-                auto cancel_fn =
-                    [](corio::Task<int> task) -> corio::Lazy<void> {
-                    co_return; // task abort here
-                };
-                auto task_cancel =
-                    co_await corio::spawn(cancel_fn(std::move(task)));
-                co_await task_cancel;
-                called = true;
-            };
+        auto f = []() -> corio::Lazy<int> {
+            while (true) {
+                co_await SimpleAwaiter{};
+            }
+            co_return 42;
+        };
+        auto g = [&]() -> corio::Lazy<void> {
+            auto task = co_await corio::spawn(f());
+            auto task2 = co_await corio::spawn(std::move(task));
+            auto task3 = co_await corio::spawn(std::move(task2));
+            bool ok = task3.abort();
+            CHECK(ok);
+            CHECK_THROWS_AS(co_await task3, corio::CancellationError);
+            CHECK(task3.is_finished());
+            CHECK(task3.is_cancelled());
+            called = true;
+        };
 
-            asio::thread_pool pool(1); // Single thread to keep the order
-            corio::spawn_background(pool.get_executor(), k());
+        corio::spawn_background(strand, g());
 
-            pool.join();
+        pool.join();
 
-            CHECK(called);
-            CHECK(count > 0);
-        }
+        CHECK(called);
     }
 
     SUBCASE("abort already done task") {
@@ -177,7 +169,7 @@ TEST_CASE("test task") {
         asio::thread_pool pool(2);
 
         auto f = []() -> corio::Lazy<int> {
-            co_await CancelableSimpleAwaiter{};
+            co_await SimpleAwaiter{};
             co_return 42;
         };
         auto g = [&]() -> corio::Lazy<void> {
@@ -200,10 +192,11 @@ TEST_CASE("test task") {
     SUBCASE("abort multiple times") {
         bool called = false;
         asio::thread_pool pool(2);
+        auto strand = asio::make_strand(pool.get_executor());
 
         auto f = []() -> corio::Lazy<int> {
             while (true) {
-                co_await CancelableSimpleAwaiter{};
+                co_await SimpleAwaiter{};
             }
             co_return 42;
         };
@@ -223,45 +216,56 @@ TEST_CASE("test task") {
             CHECK_THROWS_AS(co_await task, corio::CancellationError);
             CHECK(task.is_finished());
             CHECK(task.is_cancelled());
+            called = true;
         };
 
-        corio::spawn_background(pool.get_executor(), g());
+        corio::spawn_background(strand, g());
 
         pool.join();
+
+        CHECK(called);
     }
 
     SUBCASE("abort using abort handle") {
         bool called = false;
         asio::thread_pool pool(2);
+        auto strand = asio::make_strand(pool.get_executor());
 
         auto f = []() -> corio::Lazy<int> {
             while (true) {
-                co_await CancelableSimpleAwaiter{};
+                co_await SimpleAwaiter{};
             }
             co_return 42;
         };
-        auto g = [&]() -> corio::Lazy<void> {
+        auto g = [](corio::AbortHandle<int> handle) -> corio::Lazy<bool> {
+            bool ok = handle.abort();
+            co_return ok;
+        };
+        auto h = [&]() -> corio::Lazy<void> {
             auto task = co_await corio::spawn(f());
-            auto abort_handle = task.get_abort_handle();
-            auto h =
-                [](corio::AbortHandle<int> abort_handle) -> corio::Lazy<void> {
-                bool ok = abort_handle.abort();
-                CHECK(ok);
-                co_return;
-            };
-            // AbortHandle is copiable
-            auto task_cancel = co_await corio::spawn(h(abort_handle));
+
+            std::vector<corio::Task<bool>> tasks;
+            for (int i = 0; i < 5; ++i) {
+                tasks.push_back(
+                    co_await corio::spawn(g(task.get_abort_handle())));
+            }
+
             CHECK_THROWS_AS(co_await task, corio::CancellationError);
             CHECK(task.is_finished());
             CHECK(task.is_cancelled());
 
-            co_await task_cancel;
+            int ok_times = 0;
+            for (auto &t : tasks) {
+                if (co_await t) {
+                    ++ok_times;
+                }
+            }
+            CHECK(ok_times == 1);
+
             called = true;
-            auto ok = abort_handle.abort();
-            CHECK(!ok);
         };
 
-        corio::spawn_background(pool.get_executor(), g());
+        corio::spawn_background(strand, h());
 
         pool.join();
 

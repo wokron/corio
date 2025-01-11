@@ -1,11 +1,10 @@
 #pragma once
 
+#include "asio/strand.hpp"
 #include "corio/detail/singleton.hpp"
+#include "corio/lazy.hpp"
 #include "corio/run.hpp"
 #include "corio/task.hpp"
-#include <asio.hpp>
-#include <future>
-#include <type_traits>
 
 namespace corio {
 
@@ -23,12 +22,12 @@ private:
     asio::thread_pool pool_;
 };
 
-template <detail::awaitable Awaitable,
-          typename Return = detail::awaitable_return_t<Awaitable>>
-Lazy<void> launch_with_future(Awaitable &&awaitable,
-                              std::promise<Return> promise) {
+template <awaitable Awaitable>
+Lazy<void>
+launch_with_future(Awaitable awaitable,
+                   std::promise<awaitable_return_t<Awaitable>> promise) {
     try {
-        if constexpr (std::is_void_v<Return>) {
+        if constexpr (std::is_void_v<awaitable_return_t<Awaitable>>) {
             co_await awaitable;
             promise.set_value();
         } else {
@@ -49,19 +48,23 @@ inline asio::any_io_executor get_default_executor() noexcept {
     return detail::DefaultExecutor::get().get_executor();
 }
 
-template <detail::awaitable Awaitable, typename Return>
-inline Return block_on(asio::any_io_executor executor, Awaitable &&awaitable) {
-    std::promise<Return> promise;
-    std::future<Return> future = promise.get_future();
-    Task<void> task = spawn(
-        executor, detail::launch_with_future(std::forward<Awaitable>(awaitable),
-                                             std::move(promise)));
+template <typename Executor, detail::awaitable Awaitable>
+inline detail::awaitable_return_t<Awaitable> block_on(const Executor &executor,
+                                                      Awaitable aw) {
+    using T = detail::awaitable_return_t<Awaitable>;
+    std::promise<T> promise;
+    std::future<T> future = promise.get_future();
+    Task<void> task =
+        spawn(executor,
+              detail::launch_with_future(std::move(aw), std::move(promise)));
     return future.get();
 }
 
-template <detail::awaitable Awaitable, typename Return>
-inline Return run(Awaitable &&awaitable) {
-    return block_on(get_default_executor(), std::forward<Awaitable>(awaitable));
+template <detail::awaitable Awaitable>
+inline detail::awaitable_return_t<Awaitable> run(Awaitable aw) {
+    auto executor = get_default_executor();
+    auto serial_executor = asio::make_strand(executor);
+    return block_on(serial_executor, std::move(aw));
 }
 
 } // namespace corio

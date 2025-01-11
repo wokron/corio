@@ -1,65 +1,36 @@
+#include "asio/thread_pool.hpp"
+#include "corio/lazy.hpp"
 #include <asio.hpp>
-#include <corio/lazy.hpp>
-#include <corio/run.hpp>
 #include <corio/task.hpp>
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
-#include <vector>
-
-namespace {
-
-template <typename Rep, typename Period, typename Return>
-inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
-                                 Return return_value) {
-    co_await corio::this_coro::sleep_for(duration);
-    co_return return_value;
-}
-
-} // namespace
 
 using namespace std::chrono_literals;
 
 TEST_CASE("test this_coro") {
+    bool called = false;
     auto f = [&]() -> corio::Lazy<asio::any_io_executor> {
         co_return co_await corio::this_coro::executor;
     };
 
-    auto g = []() -> corio::Lazy<asio::strand<asio::any_io_executor>> {
-        co_return co_await corio::this_coro::strand;
+    auto g = [&]() -> corio::Lazy<void> {
+        auto ex = co_await corio::this_coro::executor;
+        auto ex2 = co_await f();
+        auto t = co_await corio::spawn(f());
+        auto ex3 = co_await t;
+        CHECK(ex == ex2);
+        CHECK(ex != ex3);
+        called = true;
     };
 
-    auto k = [&]() -> corio::Lazy<void> {
-        auto r1 = co_await f();
-        auto r2 = co_await corio::this_coro::executor;
-        CHECK(r1 == r2);
-        auto r3 = co_await g();
-        auto r4 = co_await corio::this_coro::strand;
-        CHECK(r3 == r4);
-    };
+    asio::thread_pool pool(2);
+    auto strand = asio::make_strand(pool.executor());
 
-    asio::io_context io1, io2;
+    corio::spawn_background(strand, g());
 
-    auto lazy1 = f();
-    lazy1.set_executor(io1.get_executor());
-    lazy1.execute();
-    io1.run();
-    auto ex1 = lazy1.get_result().result();
+    pool.join();
 
-    auto lazy2 = f();
-    lazy2.set_executor(io2.get_executor());
-    lazy2.execute();
-    io2.run();
-    auto ex2 = lazy2.get_result().result();
-
-    CHECK(ex1 != ex2);
-
-    asio::io_context io3;
-
-    auto lazy3 = k();
-    lazy3.set_executor(io3.get_executor());
-    lazy3.execute();
-    io3.run();
-    CHECK_NOTHROW(lazy3.get_result().result());
+    CHECK(called);
 }
 
 TEST_CASE("test this_coro awaitable") {
@@ -157,10 +128,16 @@ TEST_CASE("test this_coro awaitable") {
     }
 
     SUBCASE("test sleep concurrent") {
+        auto g = [](std::chrono::microseconds duration,
+                    int i) -> corio::Lazy<int> {
+            co_await corio::this_coro::sleep_for(duration);
+            co_return i;
+        };
+
         auto f = [&]() -> corio::Lazy<void> {
             std::vector<corio::Task<int>> tasks;
             for (int i = 0; i < 5; i++) {
-                tasks.push_back(co_await corio::spawn(sleep(100us, i)));
+                tasks.push_back(co_await corio::spawn(g(100us, i)));
             }
             for (int i = 0; i < 5; i++) {
                 co_await tasks[i];
@@ -210,30 +187,4 @@ TEST_CASE("test this_coro awaitable") {
         CHECK(!called);
         CHECK(duration < 1ms);
     }
-}
-
-[[clang::optnone]] std::thread::id get_tid() {
-    return std::this_thread::get_id();
-}
-
-TEST_CASE("test this_coro run_on") {
-    asio::thread_pool pool1(1), pool2(1);
-    bool called = false;
-    auto f = [&]() -> corio::Lazy<void> {
-        auto id1 = get_tid();
-        co_await corio::this_coro::run_on(pool2.get_executor());
-        auto id2 = get_tid();
-        co_await corio::this_coro::run_on(pool1.get_executor());
-        auto id3 = get_tid();
-        co_await corio::this_coro::run_on(pool2.get_executor());
-        auto id4 = get_tid();
-        CHECK(id1 != id2);
-        CHECK(id1 == id3);
-        CHECK(id2 == id4);
-        called = true;
-    };
-
-    corio::block_on(pool1.get_executor(), f());
-
-    CHECK(called);
 }

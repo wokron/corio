@@ -1,21 +1,21 @@
 #pragma once
 
-#include "corio/exceptions.hpp"
+#include "corio/detail/serial_runner.hpp"
+#include "corio/lazy.hpp"
 #include "corio/task.hpp"
-#include "corio/this_coro.hpp"
-#include <memory>
-#include <type_traits>
 
 namespace corio {
-
 template <typename T>
 template <detail::awaitable Awaitable>
-Task<T>::Task(Awaitable awaitable, asio::any_io_executor executor) {
-    state_ = std::make_shared<SharedState>();
-    Lazy<void> entry = launch_task_(std::move(awaitable), state_);
-    entry.set_executor(executor);
-    state_->set_entry(std::move(entry));
-    state_->entry().execute(); // After setting entry to prevent a lock
+Task<T>::Task(Awaitable aw, const detail::SerialRunner &runner) {
+    state_ = std::make_shared<SharedState>(runner);
+    Lazy<void> entry = launch_task_(std::move(aw), state_);
+    entry.set_background(state_->background());
+    auto entry_handle = entry.get();
+    state_->set_entry_handle(entry_handle);
+    entry_handle.promise().set_destroy_when_exit(true);
+    entry.execute(); // After setting entry to prevent a lock
+    entry.release();
 }
 
 template <typename T> Task<T> &Task<T>::operator=(Task &&other) noexcept {
@@ -69,39 +69,47 @@ template <typename T> bool Task<T>::detach() {
     return true;
 }
 
+namespace detail {
+
 template <typename T> class TaskAwaiter {
 public:
     using SharedState = typename Task<T>::SharedState;
 
-    explicit TaskAwaiter(std::shared_ptr<SharedState> state)
-        : state_(std::move(state)) {}
+    explicit TaskAwaiter(const std::shared_ptr<SharedState> &state)
+        : state_(state) {}
 
     bool await_ready() const noexcept { return false; }
 
-    template <typename PromiseType>
-    bool await_suspend(std::coroutine_handle<PromiseType> handle) noexcept {
+    template <typename Promise>
+    bool await_suspend(std::coroutine_handle<Promise> handle) noexcept {
         auto lock = state_->lock();
 
         if (state_->is_finished()) {
             return false;
         }
 
-        auto strand = state_->entry().get_strand();
-        state_->set_resumer(strand, handle, canceled_);
+        Promise &promise = handle.promise();
+        auto executor = promise.background()->runner.get_executor();
+
+        state_->register_resumer(executor, handle, canceled_);
 
         return true;
     }
 
     T await_resume() {
-        auto lock = state_->lock();
+        corio::Result<T> result;
+        {
+            auto lock = state_->lock();
 
-        CORIO_ASSERT(state_->is_finished(), "The task is not finished");
+            CORIO_ASSERT(state_->is_finished(), "The task is not finished");
 
-        if (state_->is_cancelled()) {
-            throw CancellationError("The task is canceled");
+            if (state_->is_cancelled()) {
+                throw CancellationError("The task is canceled");
+            }
+
+            result = std::move(state_->result());
         }
 
-        auto result = std::move(state_->result());
         if constexpr (std::is_void_v<T>) {
             result.result();
             return;
@@ -112,6 +120,7 @@ public:
 
     ~TaskAwaiter() {
         if (canceled_ != nullptr) {
+            auto lock = state_->lock();
             *canceled_ = true;
         }
     }
@@ -121,40 +130,24 @@ private:
     std::shared_ptr<bool> canceled_ = std::make_shared<bool>(false);
 };
 
-template <typename T> TaskAwaiter<T> Task<T>::operator co_await() const {
-    CORIO_ASSERT(state_ != nullptr, "Task is not initialized");
-    return TaskAwaiter<T>(state_);
-}
-
-namespace detail {
-
-template <typename T> struct TaskLazyAwaiter {
-    bool await_ready() const noexcept { return false; }
-
-    template <typename PromiseType>
-    std::coroutine_handle<typename corio::Lazy<T>::promise_type>
-    await_suspend(std::coroutine_handle<PromiseType> caller_handle) {
-        return lazy.chain_coroutine(caller_handle);
-    }
-
-    void await_resume() noexcept {}
-
-    Lazy<T> &lazy;
-};
-
 } // namespace detail
+
+template <typename T> auto Task<T>::operator co_await() const {
+    CORIO_ASSERT(state_ != nullptr, "Task is not initialized");
+    return detail::TaskAwaiter<T>(state_);
+}
 
 template <typename T>
 template <detail::awaitable Awaitable>
-Lazy<void> Task<T>::launch_task_(Awaitable awaitable,
+Lazy<void> Task<T>::launch_task_(Awaitable aw,
                                  std::shared_ptr<SharedState> state) {
     Result<T> result;
     try {
         if constexpr (std::is_void_v<T>) {
-            co_await awaitable;
+            co_await aw;
             result = Result<T>::from_result();
         } else {
-            auto r = co_await awaitable;
+            auto r = co_await aw;
             result = Result<T>::from_result(std::move(r));
         }
     } catch (...) {
@@ -163,45 +156,64 @@ Lazy<void> Task<T>::launch_task_(Awaitable awaitable,
 
     {
         auto lock = state->lock();
-
         state->set_result(std::move(result));
-        state->resume();
-
-        auto self_handle = state->entry().release();
-        CORIO_ASSERT(self_handle, "The handle is null");
-        self_handle.promise().set_destroy_when_exit(true);
+        state->request_task_resume();
+        state->set_entry_handle(nullptr);
     }
 }
 
-template <detail::awaitable Awaitable>
-Task<detail::awaitable_return_t<Awaitable>>
-spawn(asio::any_io_executor executor, Awaitable awaitable) {
-    using T = detail::awaitable_return_t<Awaitable>;
-    return Task<T>(std::move(awaitable), executor);
-}
-
-template <detail::awaitable Awaitable>
-Lazy<Task<detail::awaitable_return_t<Awaitable>>> spawn(Awaitable awaitable) {
-    // The new task will run concurrently with the current task, so we should
-    // use executor instead of strand here
-    asio::any_io_executor executor = co_await this_coro::executor;
-    co_return spawn(executor, std::move(awaitable));
-}
-
 template <typename T> bool AbortHandle<T>::abort() {
-    CORIO_ASSERT(state_ != nullptr, "The task is not initialized");
+    auto lock = state_->lock();
     return state_->request_abort();
 }
 
+namespace detail {
+
+template <detail::awaitable Awaitable> class ForkTaskAwaiter {
+public:
+    explicit ForkTaskAwaiter(Awaitable aw) : aw_(std::move(aw)) {}
+
+    bool await_ready() const noexcept { return false; }
+
+    template <typename Promise>
+    bool await_suspend(std::coroutine_handle<Promise> handle) {
+        Promise &promise = handle.promise();
+        forked_runner_ = promise.background()->runner.fork_runner();
+        return false;
+    }
+
+    auto await_resume() {
+        using T = detail::awaitable_return_t<Awaitable>;
+        return Task<T>(std::move(aw_), forked_runner_);
+    }
+
+private:
+    Awaitable aw_;
+    SerialRunner forked_runner_;
+};
+
+} // namespace detail
+
 template <detail::awaitable Awaitable>
-Lazy<void> spawn_background(Awaitable awaitable) {
-    asio::any_io_executor executor = co_await this_coro::executor;
-    spawn_background(executor, std::move(awaitable));
+Lazy<Task<detail::awaitable_return_t<Awaitable>>> spawn(Awaitable aw) {
+    co_return co_await detail::ForkTaskAwaiter<Awaitable>(std::move(aw));
+}
+
+template <typename Executor, detail::awaitable Awaitable>
+Task<detail::awaitable_return_t<Awaitable>> spawn(const Executor &executor,
+                                                  Awaitable aw) {
+    return Task<detail::awaitable_return_t<Awaitable>>(std::move(aw), executor);
+}
+
+template <typename Executor, detail::awaitable Awaitable>
+void spawn_background(const Executor &executor, Awaitable aw) {
+    auto task = spawn(executor, std::move(aw));
+    task.detach();
 }
 
 template <detail::awaitable Awaitable>
-void spawn_background(asio::any_io_executor executor, Awaitable awaitable) {
-    auto task = spawn(executor, std::move(awaitable));
+Lazy<void> spawn_background(Awaitable aw) {
+    auto task = co_await detail::ForkTaskAwaiter<Awaitable>(std::move(aw));
     task.detach();
 }
 

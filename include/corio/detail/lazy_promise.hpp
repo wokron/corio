@@ -1,32 +1,16 @@
 #pragma once
 
 #include "corio/detail/assert.hpp"
-#include "corio/detail/concepts.hpp"
 #include "corio/detail/promise_base.hpp"
 #include "corio/result.hpp"
-#include <asio.hpp>
 #include <coroutine>
-#include <functional>
 #include <optional>
-#include <type_traits>
 
 namespace corio {
 template <typename T> class Lazy;
-}
+} // namespace corio
 
 namespace corio::detail {
-
-struct FinalAwaiter {
-    bool await_ready() noexcept { return ready; }
-
-    template <typename PromiseType>
-    std::coroutine_handle<>
-    await_suspend(std::coroutine_handle<PromiseType> handle) noexcept;
-
-    void await_resume() noexcept {}
-
-    bool ready = false;
-};
 
 class LazyPromiseBase : public PromiseBase {
 public:
@@ -107,4 +91,4 @@ private:
 
 } // namespace corio::detail
 
-#include "corio/detail/impl/lazy_promise.ipp"
+#include "corio/detail/impl/lazy_promise_new.ipp"

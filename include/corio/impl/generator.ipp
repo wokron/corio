@@ -1,5 +1,6 @@
 #pragma once
 
+#include "corio/detail/assert.hpp"
 #include "corio/generator.hpp"
 #include <asio.hpp>
 #include <functional>
@@ -28,7 +29,7 @@ Generator<T>::chain_coroutine(
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
     PromiseType &caller_promise = caller_handle.promise();
-    promise.set_strand(caller_promise.strand());
+    promise.set_background(caller_promise.background());
     promise.set_caller_handle(caller_handle);
     return handle_;
 }
@@ -44,21 +45,13 @@ public:
     template <typename PromiseType>
     std::coroutine_handle<>
     await_suspend(std::coroutine_handle<PromiseType> caller_handle) {
-        update_strand_ =
-            [caller_handle](asio::strand<asio::any_io_executor> strand) {
-                caller_handle.promise().set_strand(strand);
-            };
         return gen_.chain_coroutine(caller_handle);
     }
 
-    bool await_resume() const noexcept {
-        update_strand_(gen_.get_strand());
-        return gen_.has_current();
-    }
+    bool await_resume() const noexcept { return gen_.has_current(); }
 
 private:
     Generator<T> &gen_;
-    std::function<void(asio::strand<asio::any_io_executor>)> update_strand_;
 };
 
 } // namespace detail
@@ -68,13 +61,13 @@ template <typename T> auto Generator<T>::operator co_await() noexcept {
 }
 
 template <typename T> bool Generator<T>::has_current() const {
-    CORIO_ASSERT(handle_ != nullptr, "Invalid Generator");
+    CORIO_ASSERT(handle_ != nullptr, "Invalid generator");
     promise_type &promise = handle_.promise();
     return promise.has_value();
 }
 
 template <typename T> T Generator<T>::current() {
-    CORIO_ASSERT(handle_ != nullptr, "Invalid Generator");
+    CORIO_ASSERT(handle_ != nullptr, "Invalid generator");
     promise_type &promise = handle_.promise();
     CORIO_ASSERT(has_current(), "No more elements");
     return std::move(promise.value().result());

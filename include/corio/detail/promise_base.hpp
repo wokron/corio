@@ -1,51 +1,56 @@
 #pragma once
 
-#include "corio/detail/assert.hpp"
+#include "corio/detail/background.hpp"
 #include "corio/detail/concepts.hpp"
 #include "corio/detail/this_coro.hpp"
-#include <asio.hpp>
+#include <coroutine>
 
 namespace corio::detail {
 
 class PromiseBase {
 public:
-    this_coro::detail::ExecutorAwaiter
-    await_transform(const this_coro::detail::ExecutorPlaceholder &) {
-        return {.executor = executor_};
+    ExecutorAwaiter await_transform(const executor_t &) {
+        auto executor = background_->runner.get_executor();
+        return {.executor = executor};
     }
 
-    this_coro::detail::StrandAwaiter
-    await_transform(const this_coro::detail::StrandPlaceholder &) {
-        CORIO_ASSERT(strand_.has_value(), "The strand is not set");
-        return {.strand = strand_.value()};
-    }
-
-    template <detail::awaitable Awaitable>
+    template <awaitable Awaitable>
     Awaitable &&await_transform(Awaitable &&awaitable) {
         return std::forward<Awaitable>(awaitable);
     }
 
 public:
-    void set_executor(asio::any_io_executor executor) {
-        executor_ = executor;
-        strand_ = asio::make_strand(executor_);
+    void set_background(Background *background) {
+        background_ = background;
     }
 
-    const asio::any_io_executor &executor() const { return executor_; }
-
-    void set_strand(asio::strand<asio::any_io_executor> strand) {
-        strand_ = strand;
-        executor_ = strand.get_inner_executor();
-    }
-
-    const asio::strand<asio::any_io_executor> &strand() const {
-        CORIO_ASSERT(strand_.has_value(), "The strand is not set");
-        return strand_.value();
-    }
+    Background *background() const { return background_; }
 
 private:
-    asio::any_io_executor executor_;
-    std::optional<asio::strand<asio::any_io_executor>> strand_;
+    Background *background_ = nullptr;
 };
+
+struct FinalAwaiter {
+    bool await_ready() noexcept { return ready; }
+
+    template <typename PromiseType>
+    std::coroutine_handle<>
+    await_suspend(std::coroutine_handle<PromiseType> handle) noexcept;
+
+    void await_resume() noexcept {}
+
+    bool ready = false;
+};
+
+template <typename PromiseType>
+inline std::coroutine_handle<> FinalAwaiter::await_suspend(
+    std::coroutine_handle<PromiseType> handle) noexcept {
+    auto &promise = handle.promise();
+    auto caller_handle = promise.caller_handle();
+    if (caller_handle) {
+        return caller_handle;
+    }
+    return std::noop_coroutine();
+}
 
 } // namespace corio::detail

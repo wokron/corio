@@ -1,25 +1,13 @@
-#include "corio/this_coro.hpp"
-#include <asio/thread_pool.hpp>
-#include <corio/lazy.hpp>
+#include <asio.hpp>
+#include <chrono>
 #include <corio/run.hpp>
-#include <corio/task.hpp>
 #include <doctest/doctest.h>
+#include <thread>
 
 using namespace std::chrono_literals;
 
-namespace {
-
-template <typename Rep, typename Period, typename Return>
-inline corio::Lazy<Return> sleep(std::chrono::duration<Rep, Period> duration,
-                                 Return return_value) {
-    co_await corio::this_coro::sleep_for(duration);
-    co_return return_value;
-}
-
-} // namespace
-
-TEST_CASE("test runner") {
-    SUBCASE("test block_no") {
+TEST_CASE("test run") {
+    SUBCASE("test block_on") {
         auto f = []() -> corio::Lazy<int> { co_return 42; };
 
         asio::thread_pool pool(1);
@@ -29,12 +17,15 @@ TEST_CASE("test runner") {
     }
 
     SUBCASE("test run") {
-        auto f = []() -> corio::Lazy<int> {
+        auto f = [](int i) -> corio::Lazy<int> {
+            std::this_thread::sleep_for(50us); // cpu-bound
+            co_return i;
+        };
+        auto g = [&]() -> corio::Lazy<int> {
             int sum = 0;
             std::vector<corio::Task<int>> tasks;
             for (int i = 0; i < 16; i++) {
-                auto task =
-                    co_await corio::spawn(sleep(10us, i));
+                auto task = co_await corio::spawn(f(i));
                 tasks.push_back(std::move(task));
             }
             for (auto &task : tasks) {
@@ -43,19 +34,21 @@ TEST_CASE("test runner") {
             co_return sum;
         };
 
-        auto result = corio::run(f());
+        auto start = std::chrono::steady_clock::now();
+        auto result = corio::run(g());
+        auto end = std::chrono::steady_clock::now();
         CHECK(result == 120);
     }
 
-    SUBCASE("test block_no with common awaiter") {
+    SUBCASE("test block_on with common awaiter") {
+        auto f = []() -> corio::Lazy<int> { co_return 42; };
+
         asio::thread_pool pool(1);
 
-        auto start = std::chrono::high_resolution_clock::now();
+        auto task = corio::spawn(pool.get_executor(), f());
 
-        corio::block_on(pool.get_executor(), corio::this_coro::sleep_for(10us));
+        auto r = corio::block_on(pool.get_executor(), std::move(task));
 
-        auto end = std::chrono::high_resolution_clock::now();
-
-        CHECK((end - start) >= 10us);
+        CHECK(r == 42);
     }
 }

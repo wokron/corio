@@ -1,6 +1,5 @@
 #pragma once
 
-#include "corio/detail/assert.hpp"
 #include "corio/detail/generator_promise.hpp"
 #include <coroutine>
 #include <utility>
@@ -43,7 +42,7 @@ private:
     std::coroutine_handle<promise_type> handle_ = nullptr;
 };
 
-#define async_for(decl, gen)                                                   \
+#define CORIO_ASYNC_FOR(decl, gen)                                             \
     if (auto _gen = (gen); true)                                               \
         for (bool _more = co_await _gen; _more; _more = co_await _gen)         \
             if (decl = _gen.current(); true)

@@ -1,19 +1,15 @@
 #pragma once
 
-#include "corio/detail/assert.hpp"
 #include "corio/result.hpp"
-#include <asio.hpp>
 #include <coroutine>
-#include <optional>
 #include <utility>
 
 namespace corio {
 
 namespace detail {
 template <typename T> class LazyPromise;
-}
-
-template <typename T> class LazyAwaiter;
+class Background;
+} // namespace detail
 
 template <typename T> class [[nodiscard]] Lazy {
 public:
@@ -38,6 +34,7 @@ public:
 
     operator bool() const { return handle_ != nullptr; }
 
+public:
     std::coroutine_handle<promise_type> release();
 
     void reset(std::coroutine_handle<promise_type> handle = nullptr);
@@ -47,35 +44,13 @@ public:
 public:
     bool is_finished() const;
 
-    Result<T> &get_result() {
-        CORIO_ASSERT(is_finished(), "The result is not ready");
-        return handle_.promise().get_result();
-    }
+    Result<T> &get_result();
 
-    const Result<T> &get_result() const {
-        CORIO_ASSERT(is_finished(), "The result is not ready");
-        return handle_.promise().get_result();
-    }
+    const Result<T> &get_result() const;
 
-    void set_executor(asio::any_io_executor executor) {
-        CORIO_ASSERT(handle_, "The handle is null");
-        handle_.promise().set_executor(executor);
-    }
+    void set_background(detail::Background *background);
 
-    void set_strand(asio::strand<asio::any_io_executor> strand) {
-        CORIO_ASSERT(handle_, "The handle is null");
-        handle_.promise().set_strand(strand);
-    }
-
-    void get_executor() const {
-        CORIO_ASSERT(handle_, "The handle is null");
-        return handle_.promise().executor();
-    }
-
-    auto get_strand() const {
-        CORIO_ASSERT(handle_, "The handle is null");
-        return handle_.promise().strand();
-    }
+    detail::Background *get_background() const;
 
     void execute();
 

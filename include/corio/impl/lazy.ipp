@@ -1,5 +1,7 @@
 #pragma once
 
+#include "corio/detail/assert.hpp"
+#include "corio/detail/background.hpp"
 #include "corio/detail/lazy_promise.hpp"
 #include "corio/lazy.hpp"
 
@@ -44,12 +46,34 @@ template <typename T> inline bool Lazy<T>::is_finished() const {
     return finished;
 }
 
+template <typename T> inline Result<T> &Lazy<T>::get_result() {
+    CORIO_ASSERT(handle_, "The handle is null");
+    return handle_.promise().get_result();
+}
+
+template <typename T> inline const Result<T> &Lazy<T>::get_result() const {
+    CORIO_ASSERT(handle_, "The handle is null");
+    return handle_.promise().get_result();
+}
+
+template <typename T>
+inline void Lazy<T>::set_background(detail::Background *background) {
+    CORIO_ASSERT(handle_, "The handle is null");
+    return handle_.promise().set_background(background);
+}
+
+template <typename T>
+inline detail::Background *Lazy<T>::get_background() const {
+    CORIO_ASSERT(handle_, "The handle is null");
+    return handle_.promise().background();
+}
+
 template <typename T> inline void Lazy<T>::execute() {
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
-    CORIO_ASSERT(promise.executor(), "The executor is not set");
-    auto &strand = promise.strand();
-    asio::post(strand, [h = handle_] { h.resume(); });
+    const detail::Background *bg = promise.background();
+    CORIO_ASSERT(bg != nullptr, "The background is not set");
+    asio::post(bg->runner.get_executor(), [h = handle_] { h.resume(); });
 }
 
 template <typename T>
@@ -59,7 +83,7 @@ Lazy<T>::chain_coroutine(std::coroutine_handle<PromiseType> caller_handle) {
     CORIO_ASSERT(handle_, "The handle is null");
     promise_type &promise = handle_.promise();
     PromiseType &caller_promise = caller_handle.promise();
-    promise.set_strand(caller_promise.strand());
+    promise.set_background(caller_promise.background());
     promise.set_caller_handle(caller_handle);
     return handle_;
 }
@@ -75,15 +99,10 @@ public:
     template <typename PromiseType>
     std::coroutine_handle<typename Lazy<T>::promise_type>
     await_suspend(std::coroutine_handle<PromiseType> caller_handle) {
-        update_strand_ =
-            [caller_handle](asio::strand<asio::any_io_executor> strand) {
-                caller_handle.promise().set_strand(strand);
-            };
         return lazy_.chain_coroutine(caller_handle);
     }
 
     T await_resume() {
-        update_strand_(lazy_.get_strand());
         Result<T> result = std::move(lazy_.get_result());
         lazy_.reset(); // Destroy the handle
         if constexpr (std::is_void_v<T>) {
@@ -96,7 +115,6 @@ public:
 
 private:
     Lazy<T> &lazy_;
-    std::function<void(asio::strand<asio::any_io_executor>)> update_strand_;
 };
 
 } // namespace detail

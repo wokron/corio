@@ -1,4 +1,3 @@
-#include "asio/thread_pool.hpp"
 #include "corio/lazy.hpp"
 #include <array>
 #include <chrono>
