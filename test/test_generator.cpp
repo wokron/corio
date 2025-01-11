@@ -129,7 +129,7 @@ TEST_CASE("test generator") {
             co_yield 3;
         };
 
-        auto g = [&](bool& called) -> corio::Lazy<void> {
+        auto g = [&](bool &called) -> corio::Lazy<void> {
             std::vector<int> arr;
             CORIO_ASYNC_FOR(auto e, f()) { arr.push_back(e); }
             CHECK(arr == std::vector<int>{1, 2, 3});
@@ -143,6 +143,39 @@ TEST_CASE("test generator") {
         };
 
         bool called = false;
+        auto lazy = g(called);
+        lazy.set_context(&ctx);
+        lazy.execute();
+
+        io_context.run();
+
+        CHECK(called);
+    }
+
+    SUBCASE("use for_each") {
+        auto f = []() -> corio::Generator<int> {
+            co_yield 1;
+            co_yield 2;
+            co_yield 3;
+        };
+
+        auto g = [&](bool &called) -> corio::Lazy<void> {
+            std::vector<int> arr;
+            co_await corio::async_for_each(f(),
+                                           [&](int e) { arr.push_back(e); });
+            CHECK(arr == std::vector<int>{1, 2, 3});
+            called = true;
+        };
+
+        asio::io_context io_context;
+
+        corio::detail::TaskContext ctx = {
+            .runner = asio::make_strand<asio::any_io_executor>(
+                io_context.get_executor()),
+        };
+
+        bool called = false;
+
         auto lazy = g(called);
         lazy.set_context(&ctx);
         lazy.execute();

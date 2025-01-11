@@ -1,6 +1,7 @@
 #pragma once
 
 #include "corio/detail/generator_promise.hpp"
+#include "corio/lazy.hpp"
 #include <coroutine>
 #include <utility>
 
@@ -44,6 +45,9 @@ private:
     if (auto _gen = (gen); true)                                               \
         for (bool _more = co_await _gen; _more; _more = co_await _gen)         \
             if (decl = _gen.current(); true)
+
+template <typename T, typename Fn>
+Lazy<void> async_for_each(Generator<T> generator, Fn &&fn);
 
 } // namespace corio
 

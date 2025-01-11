@@ -73,4 +73,11 @@ template <typename T> T Generator<T>::current() {
     return std::move(promise.value().result());
 }
 
+template <typename T, typename Fn>
+Lazy<void> async_for_each(Generator<T> generator, Fn &&fn) {
+    while (co_await generator) {
+        fn(generator.current());
+    }
+}
+
 } // namespace corio
