@@ -13,11 +13,16 @@ concept awaiter =
         { awaiter.await_resume() };
     };
 
+// clang-format off
 template <typename Awaitable, typename Promise = void>
-concept awaitable =
-    awaiter<Awaitable, Promise> || requires(Awaitable awaiter) {
-                                       { awaiter.operator co_await() };
-                                   };
+concept awaitable = awaiter<Awaitable, Promise>
+    || requires(Awaitable &&awaitable) {
+        { std::forward<Awaitable>(awaitable).operator co_await() };
+    }
+    || requires(Awaitable &&awaitable) {
+        { operator co_await(std::forward<Awaitable>(awaitable)) };
+    };
+// clang-format on
 
 template <typename Iterable>
 concept iterable = requires(Iterable iterable) {
