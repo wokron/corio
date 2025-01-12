@@ -34,10 +34,19 @@ TEST_CASE("test run") {
             co_return sum;
         };
 
-        auto start = std::chrono::steady_clock::now();
-        auto result = corio::run(g());
-        auto end = std::chrono::steady_clock::now();
-        CHECK(result == 120);
+        SUBCASE("test run multi thread") {
+            auto start = std::chrono::steady_clock::now();
+            auto result = corio::run(g());
+            auto end = std::chrono::steady_clock::now();
+            CHECK(result == 120);
+        }
+
+        SUBCASE("test run single thread") {
+            auto start = std::chrono::steady_clock::now();
+            auto result = corio::run(g(), /*multi_thread=*/false);
+            auto end = std::chrono::steady_clock::now();
+            CHECK(result == 120);
+        }
     }
 
     SUBCASE("test block_on with common awaiter") {

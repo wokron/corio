@@ -6,14 +6,13 @@
 
 namespace corio {
 
-inline asio::any_io_executor get_default_executor() noexcept;
-
 template <typename Executor, detail::awaitable Awaitable>
 inline detail::awaitable_return_t<Awaitable> block_on(const Executor &executor,
                                                       Awaitable aw);
 
 template <detail::awaitable Awaitable>
-inline detail::awaitable_return_t<Awaitable> run(Awaitable aw);
+inline detail::awaitable_return_t<Awaitable> run(Awaitable aw,
+                                                 bool multi_thread = true);
 
 } // namespace corio
 
