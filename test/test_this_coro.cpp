@@ -4,6 +4,7 @@
 #include <corio/task.hpp>
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
+#include <future>
 
 using namespace std::chrono_literals;
 
@@ -186,6 +187,49 @@ TEST_CASE("test this_coro awaitable") {
 
         CHECK(!called);
         CHECK(duration < 1ms);
+    }
+
+    SUBCASE("test await future") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            auto fut =
+                std::async(std::launch::async, []() -> int { return 42; });
+            auto t = co_await fut;
+            CHECK(t == 42);
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), f());
+
+        CHECK(called);
+    }
+
+    SUBCASE("test future promise") {
+        bool called = false;
+        auto f = [](std::promise<int> p) -> corio::Lazy<void> {
+            co_await corio::this_coro::sleep_for(500us);
+            p.set_value(42);
+        };
+        auto g = [&]() -> corio::Lazy<void> {
+            std::promise<int> p;
+            auto fut = p.get_future();
+            auto start = std::chrono::steady_clock::now();
+            auto t = co_await corio::spawn(f(std::move(p)));
+            co_await t;
+            auto end = std::chrono::steady_clock::now();
+            CHECK((end - start) >= 500us);
+            auto r = co_await fut;
+            CHECK(r == 42);
+            called = true;
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), g());
+
+        CHECK(called);
     }
 }
 

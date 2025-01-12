@@ -7,6 +7,10 @@
 #include <mutex>
 #include <optional>
 
+namespace corio {
+template <typename T> class Lazy;
+} // namespace corio
+
 namespace corio::detail {
 
 struct executor_t {
@@ -127,5 +131,14 @@ public:
 private:
     Executor executor_;
 };
+
+template <typename T> corio::Lazy<T> await_future(std::future<T> &future) {
+    constexpr static yield_t yield;
+    while (future.wait_for(std::chrono::seconds(1)) !=
+           std::future_status::ready) {
+        co_await yield;
+    }
+    co_return future.get();
+}
 
 } // namespace corio::detail

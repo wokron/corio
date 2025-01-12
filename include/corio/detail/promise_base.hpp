@@ -7,6 +7,14 @@
 #include <asio.hpp>
 #include <coroutine>
 
+namespace corio {
+template <typename T> class Task;
+
+template <typename Executor, detail::awaitable Awaitable>
+[[nodiscard]] Task<detail::awaitable_return_t<Awaitable>>
+spawn(const Executor &executor, Awaitable aw);
+}; // namespace corio
+
 namespace corio::detail {
 
 class PromiseBase {
@@ -44,6 +52,10 @@ public:
     template <awaitable Awaitable>
     Awaitable &&await_transform(Awaitable &&awaitable) {
         return std::forward<Awaitable>(awaitable);
+    }
+
+    template <typename T> auto await_transform(std::future<T> &future) {
+        return corio::spawn(asio::system_executor(), await_future(future));
     }
 
 public:
