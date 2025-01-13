@@ -104,11 +104,12 @@ co_await corio::async_for_each(func_gen(), [](int v) {
 corio::Lazy<int> f();
 
 int r = corio::run(f());
+// int r = corio::run(f(), /*multi_thread=*/false);
 ```
 
 #### block_on
 
-如果希望自行设定运行时，可以使用 `corio::block_on()` 函数。该函数的第一个参数应当传入一个可以转换为 `asio::any_io_executor` 的 `executor`。用户应当保证该 `executor` 上程序的执行是串行的。一些可能的 `executor` 包括：
+如果希望自行设定运行时，可以使用 `corio::block_on()` 函数。该函数的第一个参数应当传入一个可以转换为 `asio::any_io_executor` 的 `executor`。用户应当保证该 `executor` 上程序的执行是**串行**的。一些可能的 `executor` 包括：
 
 - 在单线程上运行的 `asio::io_context` 的 `executor`。
 - 线程数为 1 的 `asio::thread_pool` 的 `executor`。
@@ -243,7 +244,9 @@ concept awaitable = awaiter<Awaitable, Promise>
 
 #### any_awaitable
 
-`corio::AnyAwaitable<Ts...>` 可以接受任意可等待对象，只需保证其应用 `co_await` 后的返回值为类型 `Ts...` 中之一。如果 `Ts...` 中类型多于一个，则 `AnyAwaitable` 应用 `co_await` 后的类型为 `std::variant`。若 `Ts...` 中包含 `void`，则其被替换为 `std::monostate`；若 `Ts...` 中同一类型出现了多次，则只保留第一次出现的。
+`corio::AnyAwaitable<Ts...>` 可以接受任意可等待对象，只需保证其应用 `co_await` 后的返回值为类型 `Ts...` 中之一。
+
+如果 `Ts...` 中类型多于一个，则 `AnyAwaitable` 应用 `co_await` 后的类型为 `std::variant`。若 `Ts...` 中包含 `void`，则其被替换为 `std::monostate`；若 `Ts...` 中同一类型出现了多次，则只保留第一次出现的。
 
 ```cpp
 corio::Lazy<int> f();
@@ -473,7 +476,7 @@ io_context.run();
 // ...
 ```
 
-而在 corio 中，我们使用 `use_corio` 使 `async_wait` 返回一个可等待对象。
+而在 corio 中，我们使用 `use_corio` 使 `async_wait` 返回一个可等待对象 `corio::Operation<...>`。
 
 ```cpp
 corio::Lazy<void> f() {
