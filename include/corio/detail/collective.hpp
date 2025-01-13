@@ -1,7 +1,7 @@
 #pragma once
 
-#include "corio/detail/context.hpp"
 #include "corio/detail/concepts.hpp"
+#include "corio/detail/context.hpp"
 #include "corio/detail/type_traits.hpp"
 #include "corio/lazy.hpp"
 #include "corio/result.hpp"
@@ -144,5 +144,13 @@ private:
 
     std::vector<corio::Lazy<void>> lazies_;
 };
+
+template <typename T> auto keep_ref(T &&value) {
+    if constexpr (std::is_lvalue_reference_v<T>) {
+        return std::ref(value);
+    } else {
+        return value;
+    }
+}
 
 } // namespace corio::detail

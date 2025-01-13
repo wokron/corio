@@ -3,6 +3,7 @@
 #include <chrono>
 #include <corio/any_awaitable.hpp>
 #include <corio/detail/defer.hpp>
+#include <corio/operators.hpp>
 #include <corio/run.hpp>
 #include <corio/select.hpp>
 #include <corio/task.hpp>
@@ -188,5 +189,93 @@ TEST_CASE("test select iter") {
                 CHECK(flag);
             }
         };
+    }
+}
+
+TEST_CASE("test select operator") {
+    using namespace corio::awaitable_operators;
+
+    SUBCASE("select basic") {
+        auto f = [&]() -> corio::Lazy<void> {
+            auto start = std::chrono::steady_clock::now();
+            auto r = co_await (sleep(1s, 1) || sleep(500us, 2) ||
+                               corio::this_coro::sleep_for(10s));
+            auto end = std::chrono::steady_clock::now();
+            CHECK(r.index() == 1);
+            CHECK(std::get<1>(r) == 2);
+            CHECK((end - start) < 700us);
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), f());
+    }
+
+    SUBCASE("select cancel task") {
+        bool called = false;
+        auto f = [&]() -> corio::Lazy<void> {
+            corio::detail::DeferGuard guard([&]() { called = true; });
+            co_await corio::this_coro::sleep_for(1s);
+            CHECK(false);
+        };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            auto t = co_await corio::spawn(f());
+            auto r =
+                co_await (corio::this_coro::sleep_for(100us) || std::move(t));
+            CHECK(r.index() == 0);
+            co_await corio::this_coro::do_yield();
+            CHECK(called);
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), g());
+    }
+
+    SUBCASE("select with exception") {
+        auto f = []() -> corio::Lazy<void> {
+            throw std::runtime_error("error");
+            co_return;
+        };
+
+        auto g = [&]() -> corio::Lazy<void> {
+            auto start = std::chrono::steady_clock::now();
+            CHECK_THROWS_AS(co_await (corio::this_coro::sleep_for(1s) ||
+                                      co_await corio::spawn(f())),
+                            std::runtime_error);
+            auto end = std::chrono::steady_clock::now();
+            CHECK((end - start) < 1s);
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), g());
+    }
+
+    SUBCASE("select move-only type") {
+        auto f = []() -> corio::Lazy<std::unique_ptr<int>> {
+            co_return std::make_unique<int>(1);
+        };
+
+        auto g = []() -> corio::Lazy<std::unique_ptr<double>> {
+            co_await corio::this_coro::sleep_for(1s);
+            co_return std::make_unique<double>(2.34);
+        };
+
+        auto h = []() -> corio::Lazy<int> {
+            co_await corio::this_coro::sleep_for(1s);
+            co_return 42;
+        };
+
+        auto l = [&]() -> corio::Lazy<void> {
+            auto r = co_await (f() || g() || h());
+            CHECK(r.index() == 0);
+            CHECK(*std::get<0>(r) == 1);
+        };
+
+        asio::thread_pool pool(1);
+
+        corio::block_on(pool.get_executor(), l());
     }
 }

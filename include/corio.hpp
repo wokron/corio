@@ -6,6 +6,7 @@
 #include "corio/generator.hpp"
 #include "corio/lazy.hpp"
 #include "corio/operation.hpp"
+#include "corio/operators.hpp"
 #include "corio/result.hpp"
 #include "corio/run.hpp"
 #include "corio/select.hpp"

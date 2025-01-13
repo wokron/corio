@@ -6,18 +6,6 @@
 
 namespace corio {
 
-namespace detail {
-
-template <typename T> auto keep_ref(T &&value) {
-    if constexpr (std::is_lvalue_reference_v<T>) {
-        return std::ref(value);
-    } else {
-        return value;
-    }
-}
-
-} // namespace detail
-
 template <detail::awaitable... Awaitables>
 auto gather(Awaitables &&...awaitables) noexcept {
     auto awaitables_tuple = std::make_tuple(
