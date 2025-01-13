@@ -91,4 +91,4 @@ private:
 
 } // namespace corio::detail
 
-#include "corio/detail/impl/lazy_promise_new.ipp"
+#include "corio/detail/impl/lazy_promise.ipp"
