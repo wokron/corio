@@ -1,6 +1,7 @@
 #pragma once
 
 #include "corio/detail/concepts.hpp"
+#include "corio/detail/gather.hpp"
 #include "corio/detail/select.hpp"
 #include "corio/detail/try_gather.hpp"
 #include <tuple>
@@ -36,5 +37,8 @@ using TryGatherGenerator =
 
 template <typename... Ts>
 using SelectGenerator = CollectAwaiterGenerator<TupleSelectAwaiter, Ts...>;
+
+template <typename... Ts>
+using GatherGenerator = CollectAwaiterGenerator<TupleGatherAwaiter, Ts...>;
 
 } // namespace corio::detail
