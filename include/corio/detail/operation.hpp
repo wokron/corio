@@ -36,8 +36,10 @@ public:
 
     template <typename Promise>
     void await_suspend(std::coroutine_handle<Promise> handle) {
-        auto completion_handler =
-            CompletionHandler<Args...>(handle, signal_->slot(), result_);
+        Promise &promise = handle.promise();
+        const auto &executor = promise.context()->runner.get_executor();
+        auto completion_handler = CompletionHandler<Args...>(
+            handle, signal_->slot(), executor, result_);
         cancelled_ = completion_handler.get_canceled();
 
         initiate_(std::move(completion_handler));
