@@ -399,6 +399,17 @@ tasks.push_back(co_await corio::spawn(h()));
 auto r3 = co_await corio::gather(tasks);
 ```
 
+另外对于可变参数版本的 `gather()`，corio 提供了对 `&` 的运算符重载。
+
+```cpp
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+using corio::awaitable_operators::operator&;
+
+auto [r1, r2] = co_await (corio::spawn(f()) & corio::spawn(g()));
+```
+
 #### try_gather
 
 和 `gather()` 类似，`corio::try_gather()` 同样可以并行等待多个可等待对象，也包含了两个重载。不同之处在于，当某一个可等待对象第一个抛出异常时，`try_gather()` 将提前返回。若提前返回，剩下还未完成的 `co_await` 操作将会被取消。`try_gather()` 的返回值类型是 `std::tuple<Ts...>` 或 `std::vector<T>`。若 `T = void`，则 `T` 被替换为 `std::monostate`。
@@ -423,6 +434,17 @@ tasks.push_back(co_await corio::spawn(h()));
 
 // std::vector<int>
 auto r3 = co_await corio::gather(tasks);
+```
+
+对于可变参数版本的 `try_gather()`，corio 提供了对 `&&` 的运算符重载。
+
+```cpp
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+using corio::awaitable_operators::operator&&;
+
+auto [r1, r2] = co_await (corio::spawn(f()) && corio::spawn(g()));
 ```
 
 #### select
@@ -459,6 +481,21 @@ auto [index, _] = co_await corio::select(tasks);
 
 > [!NOTE]
 > 和 `try_gather()` 类似，也请注意 `task` 和 `std::move(task)` 的区别。
+
+对于可变参数版本的 `select()`，corio 提供了对 `||` 的运算符重载。
+
+```cpp
+using corio::awaitable_operators::operator||;
+
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+auto r = co_await (
+    corio::this_coro::sleep_for(1ms)
+    || corio::spawn(f())
+    || corio::spawn(g())
+);
+```
 
 ### 与 Asio 结合
 

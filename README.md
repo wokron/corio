@@ -408,6 +408,17 @@ tasks.push_back(co_await corio::spawn(h()));
 auto r3 = co_await corio::gather(tasks);
 ```
 
+Additionally, for the variadic version of `gather()`, Corio provides an overload for the `&` operator.
+
+```cpp
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+using corio::awaitable_operators::operator&;
+
+auto [r1, r2] = co_await (corio::spawn(f()) & corio::spawn(g()));
+```
+
 #### try_gather
 
 Similar to `gather()`, `corio::try_gather()` can also wait for multiple awaitable objects in parallel and includes two overloads. The difference is that when one of the awaitable objects throws an exception first, `try_gather()` will return early. If it returns early, the remaining unfinished `co_await` operations will be canceled. The return type of `try_gather()` is `std::tuple<Ts...>` or `std::vector<T>`. If `T = void`, `T` is replaced with `std::monostate`.
@@ -433,6 +444,18 @@ tasks.push_back(co_await corio::spawn(h()));
 
 // std::vector<int>
 auto r3 = co_await corio::gather(tasks);
+```
+
+For the variadic version of `try_gather()`, Corio provides an overload for the `&&` operator.
+
+
+```cpp
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+using corio::awaitable_operators::operator&&;
+
+auto [r1, r2] = co_await (corio::spawn(f()) && corio::spawn(g()));
 ```
 
 #### select
@@ -469,6 +492,21 @@ auto [index, _] = co_await corio::select(tasks);
 
 > [!NOTE]
 > Similar to `try_gather()`, also be aware of the difference between `task` and `std::move(task)`.
+
+For the variadic version of `select()`, Corio provides an overload for the `||` operator.
+
+```cpp
+using corio::awaitable_operators::operator||;
+
+corio::Lazy<int> f();
+corio::Lazy<void> g();
+
+auto r = co_await (
+    corio::this_coro::sleep_for(1ms)
+    || corio::spawn(f())
+    || corio::spawn(g())
+);
+```
 
 ### Integration with Asio
 
