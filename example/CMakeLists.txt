@@ -8,3 +8,6 @@ target_link_libraries(echo_server PRIVATE ${REQUIRED_LIBRARIES})
 
 add_executable(http_ok_server http_ok_server.cpp)
 target_link_libraries(http_ok_server PRIVATE ${REQUIRED_LIBRARIES})
+
+add_executable(timeout timeout.cpp)
+target_link_libraries(timeout PRIVATE ${REQUIRED_LIBRARIES})
