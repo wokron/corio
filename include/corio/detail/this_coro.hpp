@@ -20,7 +20,7 @@ struct executor_t {
 struct ExecutorAwaiter {
     bool await_ready() const noexcept { return true; }
 
-    void await_suspend(std::coroutine_handle<> handle) const noexcept {}
+    void await_suspend(std::coroutine_handle<>) const noexcept {}
 
     asio::any_io_executor await_resume() const noexcept { return executor; }
 

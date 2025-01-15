@@ -15,7 +15,7 @@ public:
     using ReturnType =
         std::pair<std::size_t, void_to_monostate_t<AwaitableReturn>>;
 
-    void init(Iterable &iterable) {
+    void init(Iterable &) {
         // DO NOTHING
     }
 
@@ -67,7 +67,7 @@ public:
         apply_each_t<std::variant,
                      transform_tuple_t<Tuple, tuple_select_result>>;
 
-    void init(Tuple &tuple) {
+    void init(Tuple &) {
         // DO NOTHING
     }
 

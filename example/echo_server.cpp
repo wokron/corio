@@ -1,12 +1,5 @@
-#include "asio/as_tuple.hpp"
-#include "asio/error_code.hpp"
-#include "asio/redirect_error.hpp"
-#include "asio/system_error.hpp"
-#include "corio/operation.hpp"
-#include "corio/task.hpp"
 #include <asio.hpp>
 #include <corio.hpp>
-#include <cstddef>
 #include <iostream>
 #include <string>
 

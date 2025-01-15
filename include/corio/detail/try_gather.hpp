@@ -60,7 +60,7 @@ template <typename Tuple> class TupleTryGatherCollectHandler {
 public:
     using ReturnType = transform_tuple_t<Tuple, tuple_try_gather_result>;
 
-    void init(Tuple &tuple) {
+    void init(Tuple &) {
         std::size_t total = std::tuple_size_v<Tuple>;
         rest_count_ = total;
     }

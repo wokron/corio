@@ -8,7 +8,7 @@ namespace corio {
 
 namespace detail {
 template <typename T> class LazyPromise;
-class TaskContext;
+struct TaskContext;
 } // namespace detail
 
 template <typename T> class [[nodiscard]] Lazy {

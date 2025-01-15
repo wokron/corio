@@ -65,12 +65,12 @@ inline bool is_operation_aborted() { return false; }
 
 template <typename Arg, typename... Args>
 requires(!std::is_same_v<std::decay_t<Arg>, asio::error_code>)
-inline bool is_operation_aborted(Arg &&arg, Args &&...args) {
+inline bool is_operation_aborted(Arg &&, Args &&...) {
     return false;
 }
 
 template <typename... Args>
-inline bool is_operation_aborted(const asio::error_code &ec, Args &&...args) {
+inline bool is_operation_aborted(const asio::error_code &ec, Args &&...) {
     return ec == asio::error::operation_aborted;
 }
 
