@@ -5,7 +5,7 @@
 #include <iostream>
 #include <marker.hpp>
 
-constexpr std::size_t n = 10'000'000;
+constexpr std::size_t n = 3'000'000;
 
 corio::Lazy<void> corio_test() {
     auto ex = co_await corio::this_coro::executor;
@@ -40,14 +40,14 @@ void launch_asio_test() {
 }
 
 int main() {
-    {
+    for (std::size_t i = 0; i < 6; i++) {
         auto dur = marker::measured(launch_corio_test)();
         std::cerr << "corio: " << dur << std::endl;
     }
-
-    {
+    for (std::size_t i = 0; i < 6; i++) {
         auto dur = marker::measured(launch_asio_test)();
         std::cerr << "asio: " << dur << std::endl;
     }
+
     return 0;
 }

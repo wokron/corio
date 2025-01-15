@@ -2,20 +2,40 @@ cmake_minimum_required(VERSION 3.0)
 
 project(corio)
 
-set(CMAKE_CXX_STANDARD 20)
-
-# Third party libraries
-add_subdirectory(third_party/doctest)
-
-add_library(asio INTERFACE)
-target_include_directories(asio INTERFACE third_party/asio/asio/include)
+set(IS_MAIN_PROJECT OFF)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+    set(IS_MAIN_PROJECT ON)
+endif()
 
 add_library(corio INTERFACE)
 target_include_directories(corio INTERFACE include)
-target_link_libraries(corio INTERFACE asio)
 
-add_subdirectory(test)
+if(IS_MAIN_PROJECT)
+    option(CORIO_BUILD_TESTS "Build the tests" ON)
+    option(CORIO_BUILD_BENCH "Build the benchmarks" ON)
+    option(CORIO_BUILD_EXAMPLES "Build the examples" ON)
 
-add_subdirectory(bench)
+    set(CMAKE_CXX_STANDARD 20)
 
-add_subdirectory(example)
+    if (CORIO_BUILD_TESTS OR CORIO_BUILD_BENCH OR CORIO_BUILD_EXAMPLES)
+        # Import asio
+        add_library(asio INTERFACE)
+        target_include_directories(asio INTERFACE third_party/asio/asio/include)
+    endif()
+
+    if(CORIO_BUILD_TESTS)
+        # Import doctest
+        add_subdirectory(third_party/doctest)
+        
+        enable_testing()
+        add_subdirectory(test)
+    endif()
+
+    if (CORIO_BUILD_BENCH)
+        add_subdirectory(bench)
+    endif()
+
+    if (CORIO_BUILD_EXAMPLES)
+        add_subdirectory(example)
+    endif()  
+endif()

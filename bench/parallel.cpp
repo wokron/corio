@@ -8,13 +8,14 @@
 constexpr std::size_t n = 3'000'000;
 
 corio::Lazy<void> corio_test() {
+    using corio::awaitable_operators::operator&&;
+
     auto ex = co_await corio::this_coro::executor;
 
     asio::experimental::channel<void(asio::error_code)> chan(ex, 0);
     for (std::size_t i = 0; i < n; i++) {
-        co_await corio::gather(
-            chan.async_send(asio::error_code{}, corio::use_corio),
-            chan.async_receive(corio::use_corio));
+        co_await (chan.async_send(asio::error_code{}, corio::use_corio) &&
+                  chan.async_receive(corio::use_corio));
     }
 }
 
@@ -43,14 +44,15 @@ void launch_asio_test() {
 }
 
 int main() {
-    {
+    for (std::size_t i = 0; i < 6; i++) {
+        auto dur = marker::measured(launch_asio_test)();
+        std::cerr << "asio: " << dur << std::endl;
+    }
+
+    for (std::size_t i = 0; i < 6; i++) {
         auto dur = marker::measured(launch_corio_test)();
         std::cerr << "corio: " << dur << std::endl;
     }
 
-    {
-        auto dur = marker::measured(launch_asio_test)();
-        std::cerr << "asio: " << dur << std::endl;
-    }
     return 0;
 }

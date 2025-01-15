@@ -3,15 +3,23 @@
 #include <iostream>
 
 template <typename T>
-corio::Lazy<void> merge_sort(T arr[], std::size_t size, T tmp[]) {
+corio::Lazy<void> merge_sort(T arr[], std::size_t size, T tmp[],
+                             std::size_t concurrency = 1) {
     if (size <= 1) {
         co_return;
     }
     std::size_t mid = size / 2;
 
-    auto t = co_await corio::spawn(merge_sort(arr, mid, tmp));
-    co_await merge_sort(arr + mid, size - mid, tmp + mid);
-    co_await t;
+    static const std::size_t THRESHOLD = std::thread::hardware_concurrency();
+    if (concurrency >= THRESHOLD) {
+        co_await merge_sort(arr, mid, tmp, concurrency);
+        co_await merge_sort(arr + mid, size - mid, tmp + mid, concurrency);
+    } else {
+        auto t =
+            co_await corio::spawn(merge_sort(arr, mid, tmp, concurrency << 1));
+        co_await merge_sort(arr + mid, size - mid, tmp + mid, concurrency << 1);
+        co_await t;
+    }
 
     std::size_t i = 0, j = mid, k = 0;
     while (i < mid && j < size) {
@@ -37,13 +45,13 @@ void generate_random_array(int arr[], std::size_t size) {
     }
 }
 
-int main() {
-    constexpr int SIZE = 100000;
+constexpr int SIZE = 10'000'000;
+int arr[SIZE];
+int tmp[SIZE];
 
-    int arr[SIZE];
+int main() {
     generate_random_array(arr, SIZE);
 
-    int tmp[SIZE];
     corio::run(merge_sort(arr, SIZE, tmp));
 
     for (int i = 1; i < SIZE; ++i) {

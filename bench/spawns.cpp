@@ -1,16 +1,25 @@
+#include "asio/experimental/parallel_group.hpp"
 #include <asio.hpp>
 #include <corio.hpp>
-#include <iostream>
 #include <marker.hpp>
 
-constexpr std::size_t n = 3'000'000;
+constexpr std::size_t n = 1'000'000;
+
+corio::Lazy<void> corio_task() {
+    static int count = 0;
+    count++;
+    co_return;
+}
 
 corio::Lazy<void> corio_test() {
     auto ex = co_await corio::this_coro::executor;
 
+    std::vector<corio::Task<void>> tasks;
     for (std::size_t i = 0; i < n; i++) {
-        co_await asio::post(ex, corio::use_corio);
+        tasks.push_back(corio::spawn(ex, corio_task()));
     }
+
+    co_await corio::gather(std::move(tasks));
 }
 
 void launch_corio_test() {
@@ -19,12 +28,25 @@ void launch_corio_test() {
     ctx.run();
 }
 
+asio::awaitable<void> asio_task() {
+    static int count = 0;
+    count++;
+    co_return;
+}
+
 asio::awaitable<void> asio_test() {
     auto ex = co_await asio::this_coro::executor;
 
+    using Task = decltype(asio::co_spawn(ex, asio_task(), asio::deferred));
+    std::vector<Task> tasks;
     for (std::size_t i = 0; i < n; i++) {
-        co_await asio::post(asio::deferred);
+        tasks.push_back(asio::co_spawn(ex, asio_task(), asio::deferred));
     }
+
+    auto group = asio::experimental::make_parallel_group(std::move(tasks));
+
+    co_await group.async_wait(asio::experimental::wait_for_all(),
+                              asio::use_awaitable);
 }
 
 void launch_asio_test() {
