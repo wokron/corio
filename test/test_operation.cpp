@@ -111,19 +111,6 @@ TEST_CASE("test operation") {
 
         corio::block_on(pool.get_executor(), g());
     }
-
-    SUBCASE("test default executor") {
-        auto f = []() -> corio::Lazy<void> {
-            auto id1 = get_tid();
-            co_await asio::post(corio::use_corio);
-            auto id2 = get_tid();
-            CHECK(id1 == id2);
-        };
-
-        asio::thread_pool pool(1);
-
-        corio::block_on(pool.get_executor(), f());
-    }
 }
 
 TEST_CASE("test tcp operations") {

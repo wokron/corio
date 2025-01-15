@@ -79,11 +79,8 @@ public:
     using ResultType = decltype(build_result(std::declval<Args>()...));
 
     explicit CompletionHandler(std::coroutine_handle<> handle,
-                               asio::cancellation_slot slot,
-                               const asio::any_io_executor &executor,
-                               ResultType &result)
-        : handle_(handle), slot_(std::move(slot)), executor_(executor),
-          result_(result) {}
+                               asio::cancellation_slot slot, ResultType &result)
+        : handle_(handle), slot_(std::move(slot)), result_(result) {}
 
 public:
     using cancellation_slot_type = asio::cancellation_slot;
@@ -104,33 +101,11 @@ public:
         handle_.resume();
     }
 
-    const asio::any_io_executor &executor() const { return executor_; }
-
 private:
     std::coroutine_handle<> handle_;
     asio::cancellation_slot slot_;
-    const asio::any_io_executor &executor_;
     ResultType &result_;
     std::unique_ptr<bool> canceled_ = std::make_unique<bool>(false);
 };
 
 } // namespace corio::detail
-
-namespace asio {
-
-template <typename... Args, typename Executor>
-struct associated_executor<corio::detail::CompletionHandler<Args...>,
-                           Executor> {
-    using type = asio::any_io_executor;
-
-    static type get(const corio::detail::CompletionHandler<Args...> &handler,
-                    const asio::any_io_executor &ex) {
-        return ex;
-    }
-
-    static type get(const corio::detail::CompletionHandler<Args...> &handler) {
-        return handler.executor();
-    }
-};
-
-} // namespace asio

@@ -5,7 +5,6 @@
 #include <corio/this_coro.hpp>
 #include <doctest/doctest.h>
 #include <future>
-#include <thread>
 
 using namespace std::chrono_literals;
 
