@@ -19,8 +19,8 @@ target_link_libraries(parallel PRIVATE ${REQUIRED_LIBRARIES})
 add_executable(immediate immediate.cpp)
 target_link_libraries(immediate PRIVATE ${REQUIRED_LIBRARIES})
 
-add_executable(spawns spawns.cpp)
-target_link_libraries(spawns PRIVATE ${REQUIRED_LIBRARIES})
+add_executable(spawn spawn.cpp)
+target_link_libraries(spawn PRIVATE ${REQUIRED_LIBRARIES})
 
 add_executable(sort sort.cpp)
 target_link_libraries(sort PRIVATE ${REQUIRED_LIBRARIES})
