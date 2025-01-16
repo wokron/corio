@@ -90,7 +90,7 @@ public:
         for (auto &awaitable : iterable) {
             corio::Lazy<void> lazy = handler_.do_co_await(*this, no, awaitable);
             lazy.set_context(get_context_());
-            lazy.execute();
+            lazy.get().resume();
             lazies_.push_back(std::move(lazy)); // Keep lazy alive
             no++;
         }
@@ -132,7 +132,7 @@ private:
             }
 
             lazy.set_context(get_context_());
-            lazy.execute();
+            lazy.get().resume();
             lazies_.push_back(std::move(lazy)); // Keep lazy alive
 
             launch_all_await_impl_<I + 1>(tuple);
