@@ -3,7 +3,7 @@
 #include <iostream>
 #include <marker.hpp>
 
-constexpr std::size_t n = 3'000'000;
+constexpr std::size_t n = 10'000'000;
 
 corio::Lazy<void> corio_test() {
     auto ex = co_await corio::this_coro::executor;
@@ -23,7 +23,7 @@ asio::awaitable<void> asio_test() {
     auto ex = co_await asio::this_coro::executor;
 
     for (std::size_t i = 0; i < n; i++) {
-        co_await asio::post(asio::deferred);
+        co_await asio::post(ex, asio::deferred);
     }
 }
 

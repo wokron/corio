@@ -68,11 +68,6 @@ public:
     auto operator co_await() const;
 
 private:
-    template <detail::awaitable Awaitable>
-    static Lazy<void> launch_task_(Awaitable aw,
-                                   std::shared_ptr<SharedState> state);
-
-private:
     std::shared_ptr<SharedState> state_;
 };
 

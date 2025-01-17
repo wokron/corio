@@ -62,8 +62,7 @@ inline void Lazy<T>::set_context(detail::TaskContext *context) {
     return handle_.promise().set_context(context);
 }
 
-template <typename T>
-inline detail::TaskContext *Lazy<T>::get_context() const {
+template <typename T> inline detail::TaskContext *Lazy<T>::get_context() const {
     CORIO_ASSERT(handle_, "The handle is null");
     return handle_.promise().context();
 }
@@ -73,7 +72,7 @@ template <typename T> inline void Lazy<T>::execute() {
     promise_type &promise = handle_.promise();
     const detail::TaskContext *ctx = promise.context();
     CORIO_ASSERT(ctx != nullptr, "The context is not set");
-    asio::post(ctx->runner.get_executor(), [h = handle_] { h.resume(); });
+    asio::post(ctx->runner.get_executor(), handle_);
 }
 
 template <typename T>
